@@ -25,10 +25,10 @@ def compute_ssim(model: torch.nn.Module, devices, data_keys, debug=False, **kwar
     # else:
     #     kw = kwargs
 
-    test_batch_size=kwargs["test_batch_size"] if "test_batch_size" in kwargs else 8
-    num_workers = kwargs["n_data_workers"] if "n_data_workers" in kwargs else 8
-    max_n_samples = kwargs["max_n_samples"] if "max_n_samples" in kwargs else 8000
-    inplane_normalize = kwargs["inplane_normalize"] if "inplane_normalize" in kwargs else False
+    test_batch_size = kwargs.get("test_batch_size", 8)
+    num_workers = kwargs.get("n_data_workers", 8)
+    max_n_samples = kwargs.get("max_n_samples", 8000)
+    inplane_normalize = kwargs.get("inplane_normalize", False)
 
     dataset, transforms = get_dataset(kwargs)
 
@@ -77,7 +77,7 @@ def compute_ssim(model: torch.nn.Module, devices, data_keys, debug=False, **kwar
         target_img = imgs["pose_img"]
 
         with torch.no_grad():
-            if "mode" in kwargs.keys():
+            if "mode" in kwargs:
                 out = model(app_img, stickman, mode=kwargs["mode"])
             else:
                 out = model(app_img, stickman)
@@ -119,20 +119,17 @@ def compute_ssim(model: torch.nn.Module, devices, data_keys, debug=False, **kwar
 def compute_fid(model, data_keys, devices, debug=False, **kwargs):
     print("Compute FID score...")
 
-    if "mode" in kwargs.keys():
+    if "mode" in kwargs:
         kw = {key: kwargs[key] for key in kwargs if key != "mode"}
     else:
         kw = kwargs
 
     assert "dataset" in kwargs
     dataset_name = kwargs["dataset"]
-    test_batch_size = kwargs[
-        "test_batch_size"] if "test_batch_size" in kwargs else 8
-    num_workers = kwargs["n_data_workers"] if "n_data_workers" in kwargs else 8
-    max_n_samples = kwargs[
-        "max_n_samples"] if "max_n_samples" in kwargs else 8000
-    inplane_normalize = kwargs[
-        "inplane_normalize"] if "inplane_normalize" in kwargs else False
+    test_batch_size = kwargs.get("test_batch_size", 8)
+    num_workers = kwargs.get("n_data_workers", 8)
+    max_n_samples = kwargs.get("max_n_samples", 8000)
+    inplane_normalize = kwargs.get("inplane_normalize", False)
 
 
     # compute inception features for gt data
@@ -156,9 +153,7 @@ def compute_fid(model, data_keys, devices, debug=False, **kwargs):
         n_max = 40
     print(f"n_max for fid computation is {n_max}")
 
-    is_precomputed = path.isfile(fid_file_name)
-
-    if is_precomputed:
+    if is_precomputed := path.isfile(fid_file_name):
         all_gt_features = np.load(fid_file_name)
 
         if debug:
@@ -249,7 +244,7 @@ def compute_fid(model, data_keys, devices, debug=False, **kwargs):
 
         with torch.no_grad():
             # train is reconstruction mode
-            if "mode" in kwargs.keys():
+            if "mode" in kwargs:
                 out = model(app_img, shape_img, mode="train")
             else:
                 out = model(app_img, shape_img)
@@ -367,7 +362,7 @@ def inception_score(imgs, dev, batch_size=32, resize=False, splits=1, debug = Fa
     splits -- number of splits
     """
 
-    print(f"Computing Inception Score...")
+    print("Computing Inception Score...")
     N = len(imgs)
 
     assert batch_size > 0

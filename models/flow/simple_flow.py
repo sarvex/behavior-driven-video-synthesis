@@ -23,10 +23,8 @@ class SupervisedTransformer(nn.Module):
         hidden_depth = kwargs["flow_hidden_depth"]
         n_flows = kwargs["n_flows"]
         conditioning_option = kwargs["flow_conditioning_option"]
-        embedding_channels = (
-            kwargs["flow_embedding_channels"]
-            if "flow_embedding_channels" in kwargs
-            else kwargs["flow_in_channels"]
+        embedding_channels = kwargs.get(
+            "flow_embedding_channels", kwargs["flow_in_channels"]
         )
         self.num_class_channels = (
             kwargs["flow_num_classes"]
@@ -58,15 +56,12 @@ class SupervisedTransformer(nn.Module):
             ).float()
         else:
             one_hot = labels
-        # embed it via embedding layer
-        embedding = self.embedder(one_hot)
-        return embedding
+        return self.embedder(one_hot)
 
     def sample(self, shape, label):
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         z_tilde = torch.randn(shape).to(device)
-        sample = self.reverse(z_tilde, label)
-        return sample
+        return self.reverse(z_tilde, label)
 
     def forward(
         self, input, label, reverse=False, train=False, labels_are_one_hot=False
@@ -113,8 +108,7 @@ class UnsupervisedTransformer(nn.Module):
     def sample(self, shape):
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         z_tilde = torch.randn(shape).to(device)
-        sample = self.reverse(z_tilde)
-        return sample
+        return self.reverse(z_tilde)
 
     def forward(self, input, reverse=False, train=False):
         if reverse:

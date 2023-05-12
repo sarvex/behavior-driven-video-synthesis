@@ -12,7 +12,7 @@ class MIDisc(nn.Module):
         # build encoder
         feat = nn.ModuleList()
         n_in = input_dim  # x and y coords
-        for k in range(n_layers):
+        for _ in range(n_layers):
             enc_tmp = nn.Linear(n_in, hidden_dim)
             feat.append(enc_tmp)
             feat.append(nn.Dropout(drop_prob))
@@ -33,9 +33,8 @@ class MIDiscConv1(nn.Module):
     def __init__(self, n_layers, input_dim, hidden_dim, drop_prob=0.0):
         super().__init__()
 
-        feat = []
-        feat.append(L2NormConv2d(input_dim, hidden_dim, kernel_size=1))
-        for k in range(n_layers):
+        feat = [L2NormConv2d(input_dim, hidden_dim, kernel_size=1)]
+        for _ in range(n_layers):
             enc_tmp = VunetRNB(
                 hidden_dim,
                 kernel_size=1,
@@ -99,12 +98,10 @@ class Sequence_disc(nn.Module):
         # build classifier
         classifier = []
         n_in = self.dim_hidden_rnn
-        for k in range(n_layers_class):
+        for _ in range(n_layers_class):
             enc_tmp = nn.Linear(n_in, dim_hidden_class)
             torch.nn.init.xavier_uniform_(enc_tmp.weight)
-            classifier.append(enc_tmp)
-            classifier.append(nn.ReLU())
-
+            classifier.extend((enc_tmp, nn.ReLU()))
             n_in = dim_hidden_class
 
         classifier.append(nn.Linear(n_in, 1))
@@ -152,9 +149,8 @@ class Sequence_disc(nn.Module):
             x = x[...,:3:]
 
         self.init_hidden(x.shape[0], device=x.get_device())
-        fmap_out = []
         _, self.hidden = self.rnn(x, self.hidden)
-        fmap_out.append(self.hidden[0])
+        fmap_out = [self.hidden[0]]
         out = self.classifier(self.hidden[0])
 
         return out, fmap_out
@@ -208,7 +204,7 @@ class Sequence_disc_conv(nn.Module):
         # build classifier
         classifier = nn.ModuleList()
         n_in = n_out * n_filter
-        for k in range(n_layers_class):
+        for _ in range(n_layers_class):
             enc_tmp = nn.Linear(n_in, dim_hidden_class)
             torch.nn.init.xavier_uniform_(enc_tmp.weight)
             classifier.append(enc_tmp)
@@ -335,12 +331,9 @@ class Sequence_disc_michael(nn.Module):
                 ),
             )
 
-        layers = []
-        layers.append(BasicBlock(self.inplanes, planes, stride, downsample))
+        layers = [BasicBlock(self.inplanes, planes, stride, downsample)]
         self.inplanes = planes * BasicBlock.expansion
-        for _ in range(1, blocks):
-            layers.append(BasicBlock(self.inplanes, planes))
-
+        layers.extend(BasicBlock(self.inplanes, planes) for _ in range(1, blocks))
         return nn.Sequential(*layers)
 
     def forward(self, x, label=None):
@@ -389,10 +382,7 @@ class Sequence_disc_michael(nn.Module):
             only_inputs=True,
         )
         gradients = gradients[0].view(x_gen.size(0), -1)  # flat the data
-        gradient_penalty = (
-            ((gradients + 1e-16).norm(2, dim=1) - 1.0) ** 2
-        ).mean()
-        return gradient_penalty
+        return (((gradients + 1e-16).norm(2, dim=1) - 1.0) ** 2).mean()
 
     def fmap_loss(self, fmap1, fmap2, loss="l1"):
         recp_loss = 0
@@ -457,11 +447,7 @@ class ResnetBlock(nn.Module):
             self.shortcut = None
 
     def forward(self, x):
-        if self.shortcut is None:
-            res = x
-        else:
-            res = self.shortcut(x)
-
+        res = x if self.shortcut is None else self.shortcut(x)
         x = self.bn1(x)
         x = self.conv1(self.actvfn(x))
         x = self.bn2(x)

@@ -534,108 +534,111 @@ class Vunet(Experiment):
         @trainer.on(Events.ITERATION_COMPLETED)
         def compute_eval_metrics(engine):
             # computes evaluation metrics and saves checkpoints
-            if (engine.state.iteration + 1) % self.config["metrics"]["n_it_metrics"] == 0:
-                # compute metrics
-                vunet.eval()
-                tr_imgs = []
-                rec_imgs = []
-                max_samples = self.config["metrics"]["max_n_samples"]
-                for i, batch in enumerate(tqdm(met_loader,
-                                               total=max_samples // met_loader.batch_size,
-                                               desc=f"Synthesizing {max_samples} images for IS computation."),
-                                          ):
+            if (engine.state.iteration + 1) % self.config["metrics"][
+                "n_it_metrics"
+            ] != 0:
+                return
+            # compute metrics
+            vunet.eval()
+            tr_imgs = []
+            rec_imgs = []
+            max_samples = self.config["metrics"]["max_n_samples"]
+            for i, batch in enumerate(tqdm(met_loader,
+                                           total=max_samples // met_loader.batch_size,
+                                           desc=f"Synthesizing {max_samples} images for IS computation."),
+                                      ):
 
-                    if i * met_loader.batch_size >=10 if self.config["general"]["debug"] else max_samples:
-                        break
+                if i * met_loader.batch_size >=10 if self.config["general"]["debug"] else max_samples:
+                    break
 
-                    if self.parallel:
-                        imgs = {name: batch[name] for name in self.data_keys}
-                    else:
-                        imgs = {
-                            name: batch[name].to(self.device) for name in
-                            self.data_keys
-                        }
+                if self.parallel:
+                    imgs = {name: batch[name] for name in self.data_keys}
+                else:
+                    imgs = {
+                        name: batch[name].to(self.device) for name in
+                        self.data_keys
+                    }
 
-                    app_img = imgs["app_img"]
-                    timg = imgs[
-                        "pose_img_inplane"] if self.config["data"]["inplane_normalize"] else \
+                app_img = imgs["app_img"]
+                timg = imgs[
+                    "pose_img_inplane"] if self.config["data"]["inplane_normalize"] else \
                     imgs["pose_img"]
-                    shape_img = imgs["stickman"]
+                shape_img = imgs["stickman"]
 
-                    with torch.no_grad():
-                        rec_img, _, _, _ = vunet(timg, shape_img)
-                        tr_img = vunet.transfer(app_img, shape_img)
+                with torch.no_grad():
+                    rec_img, _, _, _ = vunet(timg, shape_img)
+                    tr_img = vunet.transfer(app_img, shape_img)
 
-                    rec_img_cp = deepcopy(rec_img)
-                    tr_img_cp = deepcopy(tr_img)
-                    rec_imgs.append(rec_img_cp.detach().cpu())
-                    tr_imgs.append(tr_img_cp.detach().cpu())
+                rec_img_cp = deepcopy(rec_img)
+                tr_img_cp = deepcopy(tr_img)
+                rec_imgs.append(rec_img_cp.detach().cpu())
+                tr_imgs.append(tr_img_cp.detach().cpu())
 
-                    del rec_img
-                    del timg
-                    del shape_img
-                    del app_img
-                    del tr_img
+                del rec_img
+                del timg
+                del shape_img
+                del app_img
+                del tr_img
 
 
-                tr_imgs = torch.cat(tr_imgs, dim=0)
-                rec_imgs = torch.cat(rec_imgs, dim=0)
+            tr_imgs = torch.cat(tr_imgs, dim=0)
+            rec_imgs = torch.cat(rec_imgs, dim=0)
 
-                tr_dataset = torch.utils.data.TensorDataset(tr_imgs)
-                rec_dataset = torch.utils.data.TensorDataset(rec_imgs)
+            tr_dataset = torch.utils.data.TensorDataset(tr_imgs)
+            rec_dataset = torch.utils.data.TensorDataset(rec_imgs)
 
-                is_rec, std_rec = inception_score(rec_dataset, self.device,
-                                                  resize=True,
-                                                  batch_size=self.config["metrics"]["test_batch_size"])
-                is_tr, std_tr = inception_score(tr_dataset, self.device,
-                                                batch_size=self.config["metrics"]["test_batch_size"],
-                                                resize=True)
+            is_rec, std_rec = inception_score(rec_dataset, self.device,
+                                              resize=True,
+                                              batch_size=self.config["metrics"]["test_batch_size"])
+            is_tr, std_tr = inception_score(tr_dataset, self.device,
+                                            batch_size=self.config["metrics"]["test_batch_size"],
+                                            resize=True)
 
-                # compute metrics
-                ssim = compute_ssim(
-                    vunet,
-                    self.all_devices,
-                    data_keys=self.data_keys,
-                    debug=self.config["general"]["debug"],
-                    **self.config["data"],
-                    **self.config["training"],
-                    **self.config["metrics"]
-                )
-                fid = compute_fid(
-                    vunet,
-                    devices=self.all_devices,
-                    data_keys=self.data_keys,
-                    debug=self.config["general"]["debug"],
-                    **self.config["data"],
-                    **self.config["training"],
-                    **self.config["metrics"]
-                )
+            # compute metrics
+            ssim = compute_ssim(
+                vunet,
+                self.all_devices,
+                data_keys=self.data_keys,
+                debug=self.config["general"]["debug"],
+                **self.config["data"],
+                **self.config["training"],
+                **self.config["metrics"]
+            )
+            fid = compute_fid(
+                vunet,
+                devices=self.all_devices,
+                data_keys=self.data_keys,
+                debug=self.config["general"]["debug"],
+                **self.config["data"],
+                **self.config["training"],
+                **self.config["metrics"]
+            )
 
-                # add to tensorboard
-                it = engine.state.iteration
-                writer.add_scalar("fid", fid, it)
-                writer.add_scalar("ssim", ssim, it)
-                writer.add_scalar("is_rec",is_rec)
-                writer.add_scalar("is_trans",is_tr)
+            # add to tensorboard
+            it = engine.state.iteration
+            writer.add_scalar("fid", fid, it)
+            writer.add_scalar("ssim", ssim, it)
+            writer.add_scalar("is_rec",is_rec)
+            writer.add_scalar("is_trans",is_tr)
 
-                # save checkpoint to separate dir which contains the checkpoints based on metrics
-                save_dir = path.join(self.dirs["ckpt"], "epoch_ckpts")
-                os.makedirs(save_dir, exist_ok=True)
+            # save checkpoint to separate dir which contains the checkpoints based on metrics
+            save_dir = path.join(self.dirs["ckpt"], "epoch_ckpts")
+            os.makedirs(save_dir, exist_ok=True)
 
-                torch.save(
-                    vunet.state_dict(),
-                    path.join(
-                        save_dir,
-                        f"model@e{engine.state.epoch}@ssim={ssim}-fid={fid}.pth",
-                    ),
-                )
-                torch.save(
-                    optimizer.state_dict(),
-                    path.join(
-                        save_dir,
-                        f"opt@e{engine.state.epoch}@ssim={ssim}-fid={fid}.pth",
-                    ),
-                )
+            torch.save(
+                vunet.state_dict(),
+                path.join(
+                    save_dir,
+                    f"model@e{engine.state.epoch}@ssim={ssim}-fid={fid}.pth",
+                ),
+            )
+            torch.save(
+                optimizer.state_dict(),
+                path.join(
+                    save_dir,
+                    f"opt@e{engine.state.epoch}@ssim={ssim}-fid={fid}.pth",
+                ),
+            )
 
         @trainer.on(Events.STARTED)
         def set_start_it(engine):

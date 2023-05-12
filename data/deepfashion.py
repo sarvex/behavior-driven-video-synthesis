@@ -87,7 +87,7 @@ class DeepFashionDataset(BaseDataset):
             **kwargs,
         )
 
-        self.train_reg = kwargs["train_regressor"] if "train_regressor" in kwargs else False
+        self.train_reg = kwargs.get("train_regressor", False)
         self.reg_steps = kwargs["reg_steps"] if self.train_reg and "reg_steps" in kwargs else -1
         if self.random_rotation:
             self.extended_transforms = deepcopy(self.transforms)
@@ -188,8 +188,7 @@ class DeepFashionDataset(BaseDataset):
         good = True
         joints = self.data["joints"][i]
         joints = np.float32(joints[self.joint_model.body])
-        good = good and valid_joints(joints)
-        return good
+        return good and valid_joints(joints)
 
     def __len__(self):
         return self.datadict["img_paths"].shape[0]
@@ -319,12 +318,8 @@ if __name__ == "__main__":
                 for key in imgs
                 if key != "app_img"
             }
-            grid.update(
-                {
-                    "overlay": cv2.addWeighted(
-                        grid["pose_img"], 0.5, grid["stickman"], 0.5, 0
-                    )
-                }
+            grid["overlay"] = cv2.addWeighted(
+                grid["pose_img"], 0.5, grid["stickman"], 0.5, 0
             )
 
             grid = np.concatenate([grid[key] for key in grid], axis=0)

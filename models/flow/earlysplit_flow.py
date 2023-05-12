@@ -27,17 +27,14 @@ class ConditionalFlatSplitFlow(nn.Module):
         print(' Backsplitting dims: ', self.dim_diffs)
         self.subflows = nn.ModuleList()
         for dim in dims:
-            print('append flow {}->{}'.format(dim, dim))
+            print(f'append flow {dim}->{dim}')
             self.subflows.append(ConditionalFlow(in_channels=dim, embedding_dim=embedding_dim,
                                                  hidden_dim=dim*hidden_dim_mulitplier,
                                                  hidden_depth=submodule_depth, n_flows=n_flow_sub,
                                                  conditioning_option=conditioning_option))
 
     def forward(self, input_, condition, reverse=False):
-        if not reverse:
-            return self.f(input_, condition)
-        else:
-            return self.g(input_, condition)
+        return self.f(input_, condition) if not reverse else self.g(input_, condition)
 
     def f(self, x, condition):
         # forward pass
@@ -62,18 +59,15 @@ class ConditionalFlatSplitFlow(nn.Module):
         z_split = torch.split(z, self.dim_diffs, dim=1)  # z_split is a tuple
         z_tmp = torch.cat((z_split[-2], z_split[-1]), dim=1)
         z_tmp = self.subflows[-1](z_tmp, condition, reverse=True)
-        idx_tmp_z = 3
-        for i in reversed(range(len(self.subflows) - 1)):
+        for idx_tmp_z, i in enumerate(reversed(range(len(self.subflows) - 1)), start=3):
             z_tmp = torch.cat((z_split[-idx_tmp_z], z_tmp), dim=1)
             z_tmp = self.subflows[i](z_tmp, condition, reverse=True)
-            idx_tmp_z += 1
         x = z_tmp
         return x, None
 
     def make_dims(self, n_factor, z_dim):
         dims = [z_dim, 2**int(np.log2(z_dim))]
-        for n in range(1, n_factor):
-            dims.append(dims[-1]//2)
+        dims.extend(dims[-1]//2 for _ in range(1, n_factor))
         assert dims[-1] > 0
         # self.all_dims holds input dimensions to subflows
         return dims
@@ -96,7 +90,7 @@ class UnconditionalFlatSplitFlow(nn.Module):
         print(' Backsplitting dims: ', self.dim_diffs)
         self.subflows = nn.ModuleList()
         for dim in dims:
-            print('append flow {}->{}'.format(dim, dim))
+            print(f'append flow {dim}->{dim}')
             self.subflows.append(UnconditionalFlow(in_channels=dim,
                                                    hidden_dim=dim*hidden_dim_mulitplier,
                                                    hidden_depth=submodule_depth, n_flows=n_flow_sub,
@@ -104,10 +98,7 @@ class UnconditionalFlatSplitFlow(nn.Module):
                                  )
 
     def forward(self, input_, reverse=False):
-        if not reverse:
-            return self.f(input_)
-        else:
-            return self.g(input_)
+        return self.f(input_) if not reverse else self.g(input_)
 
     def f(self, x):
         # forward pass
@@ -131,18 +122,15 @@ class UnconditionalFlatSplitFlow(nn.Module):
         z_split = torch.split(z, self.dim_diffs, dim=1)  # z_split is a tuple
         z_tmp = torch.cat((z_split[-2], z_split[-1]), dim=1)
         z_tmp = self.subflows[-1](z_tmp, reverse=True)
-        idx_tmp_z = 3
-        for i in reversed(range(len(self.subflows) - 1)):
+        for idx_tmp_z, i in enumerate(reversed(range(len(self.subflows) - 1)), start=3):
             z_tmp = torch.cat((z_split[-idx_tmp_z], z_tmp), dim=1)
             z_tmp = self.subflows[i](z_tmp, reverse=True)
-            idx_tmp_z += 1
         x = z_tmp
         return x, None
 
     def make_dims(self, n_factor, z_dim):
         dims = [z_dim, 2**int(np.log2(z_dim))]
-        for n in range(1, n_factor):
-            dims.append(dims[-1]//2)
+        dims.extend(dims[-1]//2 for _ in range(1, n_factor))
         assert dims[-1] > 0
         # self.all_dims holds input dimensions to subflows
         return dims
@@ -174,9 +162,7 @@ class SupervisedTransformer(nn.Module):
     def embed(self, labels):
         # make one-hot from label
         one_hot = torch.nn.functional.one_hot(labels, num_classes=self.n_classes).float()
-        # embed it via embedding layer
-        embedding = self.embedder(one_hot)
-        return embedding
+        return self.embedder(one_hot)
 
     def forward(self, input, label, **dummykwargs):
         embedding = self.embed(label)

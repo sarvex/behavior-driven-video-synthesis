@@ -34,27 +34,8 @@ blacklist = {("S11", "2", "2", "54138969")}  # Video file is corrupted
 # Rather than include every frame from every video, we can instead wait for the pose to change
 # significantly before storing a new example.
 def select_frame_indices_to_include(subject, poses_3d_univ):
-    # To process every single frame, uncomment the following line:
-    # return np.arange(0, len(poses_3d_univ))
-
-    # Take every 64th frame for the protocol #2 test subjects
-    # (see the "Compositional Human Pose Regression" paper)
-    # if subject == "S9" or subject == "S11":
-    #     return np.arange(0, len(poses_3d_univ), 64)
-
-    # Take only frames where movement has occurred for the protocol #2 train subjects
-    frame_indices = []
     prev_joints3d = None
-    # threshold = (
-    #     40 ** 2
-    # )  # Skip frames until at least one joint has moved by 40mm
-    for i, joints3d in enumerate(poses_3d_univ):
-        # if prev_joints3d is not None:
-        #     max_move = ((joints3d - prev_joints3d) ** 2).sum(axis=-1).max()
-        #     # if max_move < threshold:
-        #     #     continue
-        # prev_joints3d = joints3d
-        frame_indices.append(i)
+    frame_indices = [i for i, joints3d in enumerate(poses_3d_univ)]
     return np.array(frame_indices)
 
 
@@ -98,13 +79,7 @@ def process_view(out_dir, subject, action, subaction, camera):
     # ) as cdf:
     #     poses_2d = np.array(cdf["Pose"])
     #     poses_2d = poses_2d.reshape((poses_2d.shape[1], 32, 2))
-    with pycdf.CDF(
-        path.join(
-            subj_dir,
-            "Poses_D3_Positions_mono_universal",
-            base_filename + ".cdf",
-        )
-    ) as cdf:
+    with pycdf.CDF(path.join(subj_dir, "Poses_D3_Positions_mono_universal", f"{base_filename}.cdf")) as cdf:
         poses_3d_univ = np.array(cdf["Pose"])
         poses_3d_univ = poses_3d_univ.reshape((poses_3d_univ.shape[1], 32, 3))
     # with pycdf.CDF(
@@ -119,7 +94,7 @@ def process_view(out_dir, subject, action, subaction, camera):
     #     angles_3d = angles_3d.reshape((angles_3d.shape[1], 78))
     # poses_3d_world = None
     # for f in world_filnames_pose:
-    with pycdf.CDF(path.join(subj_dir,"Poses_D3_Positions",world_name + ".cdf")) as cdf:
+    with pycdf.CDF(path.join(subj_dir, "Poses_D3_Positions", f"{world_name}.cdf")) as cdf:
         poses_3d_world = np.array(cdf["Pose"])
         poses_3d_world = poses_3d_world.reshape(
             (poses_3d_world.shape[1], 32, 3)
@@ -127,12 +102,12 @@ def process_view(out_dir, subject, action, subaction, camera):
     assert poses_3d_world.shape[0] == poses_3d_univ.shape[0]
     angles_3d_world = []
     try:
-        with pycdf.CDF(path.join(subj_dir,"Poses_D3_Angles",world_name + ".cdf")) as cdf:
+        with pycdf.CDF(path.join(subj_dir, "Poses_D3_Angles", f"{world_name}.cdf")) as cdf:
             angles_3d_world = np.array(cdf["Pose"])
             angles_3d_world = angles_3d_world.reshape(
                 (angles_3d_world.shape[1], 78)
             )
-        if not angles_3d_world.shape[0] == poses_3d_univ.shape[0]:
+        if angles_3d_world.shape[0] != poses_3d_univ.shape[0]:
             print("shape of poses univ: ",poses_3d_univ.shape[0])
             print("shape of poses: ",poses_3d_world.shape[0])
             print("shape of angles: ",angles_3d_world.shape[0])
@@ -140,7 +115,7 @@ def process_view(out_dir, subject, action, subaction, camera):
 
     except pycdf.CDFError as e:
         print(e)
-        print("name: " + path.join(subj_dir,"Poses_D3_Angles",world_name + ".cdf"))
+        print("name: " + path.join(subj_dir, "Poses_D3_Angles", f"{world_name}.cdf"))
         exit(-1)
     # with pycdf.CDF(path.join(subj_dir, 'Poses_D3_Angles', base_filename + '.cdf')) as cdf:
     #     angles_3d_world = np.array(cdf['Pose'])
@@ -152,7 +127,7 @@ def process_view(out_dir, subject, action, subaction, camera):
 
     frame_indices = select_frame_indices_to_include(subject, poses_3d_univ)
     frames = frame_indices + 1
-    video_file = path.join(subj_dir, "Videos", base_filename + ".mp4")
+    video_file = path.join(subj_dir, "Videos", f"{base_filename}.mp4")
     frames_dir = path.join(out_dir, "imageSequence", camera)
     if not path.isdir(frames_dir):
         raise NotADirectoryError(
@@ -161,7 +136,7 @@ def process_view(out_dir, subject, action, subaction, camera):
     # makedirs(frames_dir, exist_ok=True)
 
     # Check to see whether the frame images have already been extracted previously
-    existing_files = {f for f in listdir(frames_dir)}
+    existing_files = set(listdir(frames_dir))
     frames_are_extracted = True
     # frame_paths = []
     # imsizes = []
@@ -228,7 +203,7 @@ def process_subaction(subject, action, subaction):
         "processed",
         "all",
         subject,
-        metadata.action_names[action] + "-" + subaction,
+        f"{metadata.action_names[action]}-{subaction}",
     )
     if not path.isdir(out_dir):
         raise NotADirectoryError(f"Desired out_dir {out_dir} not found.")
@@ -253,12 +228,10 @@ def process_subaction(subject, action, subaction):
             else:
                 datasets[k] = [v]
 
-    if len(datasets) == 0:
+    if not datasets:
         return
 
-    datasets = {k: np.concatenate(v) for k, v in datasets.items()}
-
-    return datasets
+    return {k: np.concatenate(v) for k, v in datasets.items()}
 
     # with h5py.File(path.join(out_dir, 'annot.h5'), 'w') as f:
     #     for name, data in datasets.items():

@@ -94,7 +94,9 @@ class BehaviorNet(Experiment):
                 map_location="cpu",
             )
         else:
-            print(RED + f'Warning: No ckpt and hyoerparameters for a pretrained synthesis model found under "{synth_model_ckpt}" and "{synth_model_params}". No videos will be rendered...')
+            print(
+                f'{RED}Warning: No ckpt and hyoerparameters for a pretrained synthesis model found under "{synth_model_ckpt}" and "{synth_model_params}". No videos will be rendered...'
+            )
             self.synth_ckpt = None
             self.synth_params = None
 

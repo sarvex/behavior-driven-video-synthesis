@@ -52,18 +52,24 @@ def process_view(ddir, out_dir, subject, action, subaction, camera):
     subj_dir = path.join(ddir,'extracted', subject)
 
     base_filename = metadata.get_base_filename(subject, action, subaction, camera)
-    poses_3d_univ = cdflib.CDF(path.join(subj_dir, 'Poses_D3_Positions_mono_universal', base_filename + '.cdf'))
+    poses_3d_univ = cdflib.CDF(
+        path.join(
+            subj_dir,
+            'Poses_D3_Positions_mono_universal',
+            f'{base_filename}.cdf',
+        )
+    )
     poses_3d_univ = np.array(poses_3d_univ['Pose'])
     poses_3d_univ = poses_3d_univ.reshape(poses_3d_univ.shape[1], 32, 3)
 
     frame_indices = select_frame_indices_to_include(subject, poses_3d_univ)
     frames = frame_indices + 1
-    video_file = path.join(subj_dir, 'Videos', base_filename + '.mp4')
+    video_file = path.join(subj_dir, 'Videos', f'{base_filename}.mp4')
     frames_dir = path.join(out_dir, 'imageSequence', camera)
     makedirs(frames_dir, exist_ok=True)
 
     # Check to see whether the frame images have already been extracted previously
-    existing_files = {f for f in listdir(frames_dir)}
+    existing_files = set(listdir(frames_dir))
     frames_are_extracted = True
     for i in frames:
         filename = 'img_%06d.jpg' % i
@@ -96,7 +102,13 @@ def process_view(ddir, out_dir, subject, action, subaction, camera):
 def process_subaction(ddir,subject, action, subaction):
     datasets = {}
 
-    out_dir = path.join(ddir,'processed','all', subject, metadata.action_names[action] + '-' + subaction)
+    out_dir = path.join(
+        ddir,
+        'processed',
+        'all',
+        subject,
+        f'{metadata.action_names[action]}-{subaction}',
+    )
     makedirs(out_dir, exist_ok=True)
 
     for camera in tqdm(metadata.camera_ids, ascii=True, leave=False):

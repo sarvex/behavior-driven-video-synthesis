@@ -12,10 +12,7 @@ subjects = ['S1', 'S5', 'S6', 'S7', 'S8', 'S9', 'S11']
 def commonprefix(m):
     s1 = min(m)
     s2 = max(m)
-    for i, c in enumerate(s1):
-        if c != s2[i]:
-            return s1[:i]
-    return s1
+    return next((s1[:i] for i, c in enumerate(s1) if c != s2[i]), s1)
 
 
 def extract_tgz(tgz_file, dest):
@@ -33,18 +30,25 @@ def extract_tgz(tgz_file, dest):
 def extract_all():
     path_base = '/net/hcihome/storage/tmilbich/tmilbich/iwr/Datasets/human3.6M'
     for subject_id in tqdm(subjects, ascii=True):
-          out_dir = path.join(path_base, 'extracted', subject_id)
-          makedirs(out_dir, exist_ok=True)
-          extract_tgz(path.join(path_base, 'poses_by_subject/Poses_D2_Positions_{}.tgz'.format(subject_id)),
-                      path.join(out_dir, 'Poses_D2_Positions'))
+        out_dir = path.join(path_base, 'extracted', subject_id)
+        makedirs(out_dir, exist_ok=True)
+        extract_tgz(
+            path.join(
+                path_base,
+                f'poses_by_subject/Poses_D2_Positions_{subject_id}.tgz',
+            ),
+            path.join(out_dir, 'Poses_D2_Positions'),
+        )
           # extract_tgz('archives/Poses_D3_Positions_{}.tgz'.format(subject_id),
           #             path.join(out_dir, 'Poses_D3_Positions')),
           # extract_tgz('archives/Poses_D3_Positions_mono_{}.tgz'.format(subject_id),
           #             path.join(out_dir, 'Poses_D3_Positions_mono')),
           # extract_tgz('archives/Poses_D3_Positions_mono_universal_{}.tgz'.format(subject_id),
           #             path.join(out_dir, 'Poses_D3_Positions_mono_universal')),
-          extract_tgz(path.join(path_base, 'videos_by_subject/Videos_{}.tgz'.format(subject_id)),
-                      path.join(out_dir, 'Videos'))
+        extract_tgz(
+            path.join(path_base, f'videos_by_subject/Videos_{subject_id}.tgz'),
+            path.join(out_dir, 'Videos'),
+        )
 
 
 if __name__ == '__main__':

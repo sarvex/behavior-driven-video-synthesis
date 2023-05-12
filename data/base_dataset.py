@@ -37,31 +37,17 @@ class BaseDataset(Dataset):
 
         self.complete_datadict = None
         # default spatial size is 256 (only used for image/video generation
-        self.spatial_size = (
-            kwargs["spatial_size"] if "spatial_size" in kwargs else 256
-        )
-        self.use_person_split = (
-            kwargs["use_person_split"] if "use_person_split" in kwargs else True
-        )
+        self.spatial_size = kwargs.get("spatial_size", 256)
+        self.use_person_split = kwargs.get("use_person_split", True)
         # use crops if required; Note: this is currently only used in synthesis module
         # for computation of image quality metrics
-        self.use_crops = (
-            kwargs["use_crops"] if "use_crops" in kwargs.keys() else False
-        )
+        self.use_crops = kwargs.get("use_crops", False)
         self.datakeys = data_keys
-        self.use_crops_for_app = (
-            kwargs["crop_app"] if "crop_app" in kwargs.keys() else False
-        )
+        self.use_crops_for_app = kwargs.get("crop_app", False)
 
-        self.prepare_seq_matching = (
-            kwargs["prepare_seq_matching"]
-            if "prepare_seq_matching" in kwargs.keys()
-            else False
-        )
+        self.prepare_seq_matching = kwargs.get("prepare_seq_matching", False)
 
-        self.train_reg = (
-            kwargs["train_regressor"] if "train_regressor" in kwargs else False
-        )
+        self.train_reg = kwargs.get("train_regressor", False)
         self.reg_steps = (
             kwargs["reg_steps"]
             if self.train_reg and "reg_steps" in kwargs
@@ -72,44 +58,26 @@ class BaseDataset(Dataset):
             addkeys = ["reg_imgs", "reg_targets"]
             self.datakeys.extend(addkeys)
 
-        self.train_synthesis = (
-            kwargs["train_synthesis"] if "train_synthesis" in kwargs else False
-        )
+        self.train_synthesis = kwargs.get("train_synthesis", False)
 
         # overall data split
-        self.overall_split = (
-            kwargs["overall_split"] if "overall_split" in kwargs else False
-        )
+        self.overall_split = kwargs.get("overall_split", False)
 
         # sequence length related stuff
-        self.sequential_frame_lag = (
-            kwargs["sequential_frame_lag"]
-            if "sequential_frame_lag" in kwargs.keys()
-            else 1
-        )
+        self.sequential_frame_lag = kwargs.get("sequential_frame_lag", 1)
         assert self.sequential_frame_lag >= 1
 
         self.seq_length = (
             seq_length
-            if isinstance(seq_length, tuple) or isinstance(seq_length, list)
+            if isinstance(seq_length, (tuple, list))
             else (seq_length, seq_length)
         )
 
-        if "label_transfer" in kwargs.keys() and kwargs["label_transfer"]:
-            self.label_transfer = True
-        else:
-            self.label_transfer = False
-
-        if "inplane_normalize" in kwargs.keys():
-            self.inplane_norm = kwargs["inplane_normalize"]
-        else:
-            self.inplane_norm = False
-
-        if "box_factor" in kwargs.keys():
-            self.box_factor = kwargs["box_factor"]
-        else:
-            self.box_factor = -1
-
+        self.label_transfer = bool(
+            "label_transfer" in kwargs and kwargs["label_transfer"]
+        )
+        self.inplane_norm = kwargs.get("inplane_normalize", False)
+        self.box_factor = kwargs.get("box_factor", -1)
         if self.inplane_norm and self.box_factor < 0:
             raise ValueError(
                 f"The box factor must be larger than zero if inplane normalization should be applied to the appearance images but is actually {self.box_factor}"
@@ -137,9 +105,7 @@ class BaseDataset(Dataset):
         }
 
         if "pose_img" in self.datakeys:
-            self._output_dict.update(
-                {"pose_img_inplane": self._get_pose_img_inplane}
-            )
+            self._output_dict["pose_img_inplane"] = self._get_pose_img_inplane
             self.datakeys.append("pose_img_inplane")
         try:
             self.root_joint_idx = self.joint_model.kp_to_joint.index("head")
@@ -151,19 +117,16 @@ class BaseDataset(Dataset):
                 (
                     len(self.joint_model.left_lines),
                     len(self.joint_model.right_lines),
-                    len(self.joint_model.head_lines)
-                    + len(self.joint_model.face),
+                    len(self.joint_model.head_lines) + len(self.joint_model.face),
                 )
             )
-            if "diff_line_colors" in kwargs.keys()
-            and kwargs["diff_line_colors"]
+            if "diff_line_colors" in kwargs and kwargs["diff_line_colors"]
             else None
         )
 
         self.stickman_scale = (
             kwargs["stickman_scale"]
-            if "stickman_scale" in kwargs.keys()
-            and kwargs["stickman_scale"] > 0
+            if "stickman_scale" in kwargs and kwargs["stickman_scale"] > 0
             else None
         )
 
@@ -175,7 +138,7 @@ class BaseDataset(Dataset):
 
         if "cropped_pose_img" in data_keys and self.use_crops:
             warnings.warn(
-                f"use_crops is enabled and cropped_pose_img is in data_keys! Loading of the cropped pose image is hence duplicated. remove one option for faster training."
+                "use_crops is enabled and cropped_pose_img is in data_keys! Loading of the cropped pose image is hence duplicated. remove one option for faster training."
             )
 
         self.transforms = transforms
@@ -195,9 +158,7 @@ class BaseDataset(Dataset):
                 f'If synth_weights shall be used, a "synth_weights"-parameter has to define the weight value which shall be used within the bounding box'
             )
 
-        self.synth_weights = (
-            kwargs["synth_weights"] if "synth_weights" in kwargs else None
-        )
+        self.synth_weights = kwargs.get("synth_weights", None)
 
         self.datadict = {
             "img_paths": np.asarray([], dtype=np.object),
@@ -316,11 +277,7 @@ class BaseDataset(Dataset):
 
     def _get_img_size(self, ids):
         img_paths = self.datadict["img_paths"][ids]
-        sizes = []
-        for p in img_paths:
-            # image shape
-            sizes.append(torch.tensor(imagesize.get(p), dtype=torch.int))
-
+        sizes = [torch.tensor(imagesize.get(p), dtype=torch.int) for p in img_paths]
         return torch.stack(sizes, dim=0).squeeze(dim=0)
 
     def _get_keypoints(self, ids, use_map_ids=False):
@@ -358,9 +315,7 @@ class BaseDataset(Dataset):
 
                 kpts.append(kps)
 
-        kpts = np.stack(kpts, axis=0).squeeze()
-
-        return kpts
+        return np.stack(kpts, axis=0).squeeze()
 
     def _get_matched_keypoints(self, ids):
 
@@ -446,45 +401,44 @@ class BaseDataset(Dataset):
                     part_img = np.zeros([hw[0], hw[1], 3], dtype=np.uint8)
                     # get transformation
                     T = t(kps, jm=self.joint_model, wh=wh, oh=oh)
-                    if T is not None:
-                        part_img = cv2.warpPerspective(
+                    part_img = (
+                        cv2.warpPerspective(
                             orig_img, T, hw, borderMode=cv2.BORDER_REPLICATE
                         )
-                    else:
-                        part_img = np.zeros((hw[0], hw[1], 3), dtype=np.uint8)
+                        if T is not None
+                        else np.zeros((hw[0], hw[1], 3), dtype=np.uint8)
+                    )
                     part_imgs.append(self.stickman_transforms(part_img))
 
                 # since part_imgs are already torch.tensors, concatenate in first axis
                 pimg = torch.cat(part_imgs, dim=0)
                 prep_imgs.append(pimg)
 
+        elif self.use_crops_for_app:
+            kpts = ddict["keypoints"][ddict["map_ids"][ids]]
+            for p, kps in zip(app_paths, kpts):
+                pimg = cv2.imread(p)
+                pimg = cv2.cvtColor(pimg, cv2.COLOR_BGR2RGB)
+
+                crop_dict = get_bounding_box(kps, pimg.shape)
+                cr_box = crop_dict["bbox"]
+
+                if np.any(crop_dict["pads"] > 0):
+                    pimg = cv2.copyMakeBorder(
+                        pimg,
+                        crop_dict["pads"][0],
+                        crop_dict["pads"][1],
+                        crop_dict["pads"][2],
+                        crop_dict["pads"][3],
+                        borderType=cv2.BORDER_REFLECT,
+                    )
+                pimg = pimg[cr_box[2] : cr_box[3], cr_box[0] : cr_box[1]]
+                prep_imgs.append(self.transforms(pimg))
         else:
-            # use image cropped around the keypoints of the specific person
-            if self.use_crops_for_app:
-                kpts = ddict["keypoints"][ddict["map_ids"][ids]]
-                for p, kps in zip(app_paths, kpts):
-                    pimg = cv2.imread(p)
-                    pimg = cv2.cvtColor(pimg, cv2.COLOR_BGR2RGB)
-
-                    crop_dict = get_bounding_box(kps, pimg.shape)
-                    cr_box = crop_dict["bbox"]
-
-                    if np.any(crop_dict["pads"] > 0):
-                        pimg = cv2.copyMakeBorder(
-                            pimg,
-                            crop_dict["pads"][0],
-                            crop_dict["pads"][1],
-                            crop_dict["pads"][2],
-                            crop_dict["pads"][3],
-                            borderType=cv2.BORDER_REFLECT,
-                        )
-                    pimg = pimg[cr_box[2] : cr_box[3], cr_box[0] : cr_box[1]]
-                    prep_imgs.append(self.transforms(pimg))
-            else:
-                for p in app_paths:
-                    pimg = cv2.imread(p)
-                    pimg = cv2.cvtColor(pimg, cv2.COLOR_BGR2RGB)
-                    prep_imgs.append(self.transforms(pimg))
+            for p in app_paths:
+                pimg = cv2.imread(p)
+                pimg = cv2.cvtColor(pimg, cv2.COLOR_BGR2RGB)
+                prep_imgs.append(self.transforms(pimg))
 
         return torch.stack(prep_imgs, dim=0).squeeze()
 
@@ -546,22 +500,17 @@ class BaseDataset(Dataset):
             ids = self._sample_valid_seq_ids(
                 [self.datadict["map_ids"][ids[0]], len(ids) - 1]
             )
-            return np.asarray(ids)
-        else:
-            return np.asarray(ids)
+        return np.asarray(ids)
 
     def _get_action(self, ids):
         return self.datadict["action"][ids]
 
     def _sample_valid_seq_ids(self, input_data):
-        if all(map(lambda x: x == 0, self.seq_length)) and isinstance(
-            input_data, int
-        ):
-            return [input_data]
-        elif all(map(lambda x: x == 0, self.seq_length)) and isinstance(
-            input_data, list
-        ):
-            return [input_data[0]]
+        if all(map(lambda x: x == 0, self.seq_length)):
+            if isinstance(input_data, int):
+                return [input_data]
+            elif isinstance(input_data, list):
+                return [input_data[0]]
 
         if isinstance(input_data, int):
             idx = input_data
@@ -597,14 +546,14 @@ class BaseDataset(Dataset):
 
     def _get_sequence_end_ids(self):
 
-        self.sequence_end_ids = dict()
+        self.sequence_end_ids = {}
         for k in list(np.unique(self.datadict["v_ids"])):
             self.sequence_end_ids[k] = np.max(
                 np.where(self.datadict["v_ids"] == k)[0]
             )
 
     def _get_sequence_start_ids(self):
-        self.sequence_start_ids = dict()
+        self.sequence_start_ids = {}
         for k in list(np.unique(self.datadict["v_ids"])):
             self.sequence_start_ids[k] = np.min(
                 np.where(self.datadict["v_ids"] == k)[0]

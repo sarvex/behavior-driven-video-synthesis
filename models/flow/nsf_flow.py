@@ -545,8 +545,7 @@ class Transformer(nn.Module):
     def sample(self, shape):
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         z_tilde = torch.randn(shape).to(device)
-        sample = self.reverse(z_tilde)
-        return sample
+        return self.reverse(z_tilde)
 
     def forward(self, input, reverse=False, train=False):
         if reverse:

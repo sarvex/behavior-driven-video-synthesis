@@ -20,7 +20,7 @@ class ConditionalFlow(nn.Module):
         self.sub_layers = nn.ModuleList()
         if self.conditioning_option.lower() != "none":
             self.conditioning_layers = nn.ModuleList()
-        for flow in range(self.n_flows):
+        for _ in range(self.n_flows):
             self.sub_layers.append(ConditionalFlatDoubleCouplingFlowBlock(
                                    self.in_channels, self.cond_channels, self.mid_channels,
                                    self.num_blocks, activation=activation)
@@ -29,7 +29,7 @@ class ConditionalFlow(nn.Module):
                 self.conditioning_layers.append(nn.Conv2d(self.cond_channels, self.cond_channels, 1))
 
     def forward(self, x, embedding, reverse=False):
-        hconds = list()
+        hconds = []
         hcond = embedding[:,:,None,None]
         self.last_outs = []
         self.last_logdets = []
@@ -66,7 +66,7 @@ class UnconditionalFlow(nn.Module):
         self.n_flows = n_flows
         self.sub_layers = nn.ModuleList()
 
-        for flow in range(self.n_flows):
+        for _ in range(self.n_flows):
             self.sub_layers.append(UnconditionalFlatDoubleCouplingFlowBlock(
                                    self.in_channels, self.mid_channels,
                                    self.num_blocks, activation=activation)
@@ -102,7 +102,7 @@ class UnconditionalFlow2(nn.Module):
         self.n_flows = n_flows
         self.sub_layers = nn.ModuleList()
 
-        for flow in range(self.n_flows):
+        for _ in range(self.n_flows):
             self.sub_layers.append(UnconditionalFlatDoubleCouplingFlowBlock2(
                                    self.in_channels, self.mid_channels,
                                    self.num_blocks)
@@ -138,7 +138,7 @@ class UnconditionalGINFlow(nn.Module):
         self.n_flows = n_flows
         self.sub_layers = nn.ModuleList()
 
-        for flow in range(self.n_flows):
+        for _ in range(self.n_flows):
             self.sub_layers.append(UnconditionalFlatDoubleCouplingGINFlowBlock(
                                    self.in_channels, self.mid_channels,
                                    self.num_blocks)
@@ -174,7 +174,7 @@ class UnconditionalGIN2Flow(nn.Module):
         self.n_flows = n_flows
         self.sub_layers = nn.ModuleList()
 
-        for flow in range(self.n_flows):
+        for _ in range(self.n_flows):
             self.sub_layers.append(UnconditionalFlatDoubleCouplingGIN2FlowBlock(
                                    self.in_channels, self.mid_channels,
                                    self.num_blocks)
@@ -210,7 +210,7 @@ class UnconditionalNICEFlow(nn.Module):
         self.n_flows = n_flows
         self.sub_layers = nn.ModuleList()
 
-        for flow in range(self.n_flows):
+        for _ in range(self.n_flows):
             self.sub_layers.append(UnconditionalFlatDoubleCouplingNICEFlowBlock(
                                    self.in_channels, self.mid_channels,
                                    self.num_blocks)
@@ -504,8 +504,8 @@ class UnconditionalFlatDoubleCouplingFlowBlock(nn.Module):
         self.shuffle = Shuffle(in_channels)
 
     def forward(self, x, reverse=False):
+        h = x
         if not reverse:
-            h = x
             logdet = 0.0
             h, ld = self.norm_layer(h)
             logdet += ld
@@ -517,7 +517,6 @@ class UnconditionalFlatDoubleCouplingFlowBlock(nn.Module):
             logdet += ld
             return h, logdet
         else:
-            h = x
             h = self.shuffle(h, reverse=True)
             h = self.coupling(h, reverse=True)
             h = self.activation(h, reverse=True)
@@ -538,8 +537,8 @@ class UnconditionalFlatDoubleCouplingFlowBlock2(nn.Module):
         self.shuffle = Shuffle(in_channels)
 
     def forward(self, x, reverse=False):
+        h = x
         if not reverse:
-            h = x
             logdet = 0.0
             h, ld = self.norm_layer(h)
             logdet += ld
@@ -549,7 +548,6 @@ class UnconditionalFlatDoubleCouplingFlowBlock2(nn.Module):
             logdet += ld
             return h, logdet
         else:
-            h = x
             h = self.shuffle(h, reverse=True)
             h = self.coupling(h, reverse=True)
             h = self.norm_layer(h, reverse=True)
@@ -569,8 +567,8 @@ class UnconditionalFlatDoubleCouplingGINFlowBlock(nn.Module):
         self.shuffle = Shuffle(in_channels)
 
     def forward(self, x, reverse=False):
+        h = x
         if not reverse:
-            h = x
             logdet = 0.0
             h, ld = self.norm_layer(h)
             logdet += ld
@@ -580,7 +578,6 @@ class UnconditionalFlatDoubleCouplingGINFlowBlock(nn.Module):
             logdet += ld
             return h, logdet
         else:
-            h = x
             h = self.shuffle(h, reverse=True)
             h = self.coupling(h, reverse=True)
             h = self.norm_layer(h, reverse=True)
@@ -600,8 +597,8 @@ class UnconditionalFlatDoubleCouplingGIN2FlowBlock(nn.Module):
         self.shuffle = Shuffle(in_channels)
 
     def forward(self, x, reverse=False):
+        h = x
         if not reverse:
-            h = x
             logdet = 0.0
             h, ld = self.norm_layer(h)
             logdet += ld
@@ -611,7 +608,6 @@ class UnconditionalFlatDoubleCouplingGIN2FlowBlock(nn.Module):
             logdet += ld
             return h, logdet
         else:
-            h = x
             h = self.shuffle(h, reverse=True)
             h = self.coupling(h, reverse=True)
             h = self.norm_layer(h, reverse=True)
@@ -631,8 +627,8 @@ class UnconditionalFlatDoubleCouplingNICEFlowBlock(nn.Module):
         self.shuffle = Shuffle(in_channels)
 
     def forward(self, x, reverse=False):
+        h = x
         if not reverse:
-            h = x
             logdet = 0.0
             #h, ld = self.norm_layer(h)
             #logdet += ld
@@ -642,7 +638,6 @@ class UnconditionalFlatDoubleCouplingNICEFlowBlock(nn.Module):
             logdet += ld
             return h, logdet
         else:
-            h = x
             h = self.shuffle(h, reverse=True)
             h = self.coupling(h, reverse=True)
             #h = self.norm_layer(h, reverse=True)
@@ -665,8 +660,8 @@ class ConditionalFlatDoubleCouplingFlowBlock(nn.Module):
         self.shuffle = Shuffle(in_channels)
 
     def forward(self, x, xcond, reverse=False):
+        h = x
         if not reverse:
-            h = x
             logdet = 0.0
             h, ld = self.norm_layer(h)
             logdet += ld
@@ -678,7 +673,6 @@ class ConditionalFlatDoubleCouplingFlowBlock(nn.Module):
             logdet += ld
             return h, logdet
         else:
-            h = x
             h = self.shuffle(h, reverse=True)
             h = self.coupling(h, xcond, reverse=True)
             h = self.activation(h, reverse=True)
@@ -721,13 +715,19 @@ class OrthogonalPermute(nn.Module):
             x = x.unsqueeze(2).unsqueeze(3)
             twodim = True
         if not reverse:
-            if not twodim:
-                return F.conv2d(x, self.forward_orthogonal.unsqueeze(2).unsqueeze(3)), 0
-            return F.conv2d(x, self.forward_orthogonal.unsqueeze(2).unsqueeze(3)).squeeze(), 0
-        else:
-            if not twodim:
-                return F.conv2d(x, self.backward_orthogonal.unsqueeze(2).unsqueeze(3))
-            return F.conv2d(x, self.backward_orthogonal.unsqueeze(2).unsqueeze(3)).squeeze()
+            return (
+                (F.conv2d(x, self.forward_orthogonal.unsqueeze(2).unsqueeze(3)), 0)
+                if not twodim
+                else (
+                    F.conv2d(
+                        x, self.forward_orthogonal.unsqueeze(2).unsqueeze(3)
+                    ).squeeze(),
+                    0,
+                )
+            )
+        if not twodim:
+            return F.conv2d(x, self.backward_orthogonal.unsqueeze(2).unsqueeze(3))
+        return F.conv2d(x, self.backward_orthogonal.unsqueeze(2).unsqueeze(3)).squeeze()
 
 
 class IgnoreLeakyRelu(nn.Module):
@@ -736,14 +736,10 @@ class IgnoreLeakyRelu(nn.Module):
         super().__init__()
 
     def forward(self, input, reverse=False):
-        if reverse:
-            return self.reverse(input)
-        h = input
-        return h, 0.0
+        return self.reverse(input) if reverse else (input, 0.0)
 
     def reverse(self, input):
-        h = input
-        return h
+        return input
 
 
 class InvLeakyRelu(nn.Module):
@@ -760,8 +756,7 @@ class InvLeakyRelu(nn.Module):
 
     def reverse(self, input):
         scaling = (input >= 0).to(input) + (input < 0).to(input)*self.alpha
-        h = input/scaling
-        return h
+        return input/scaling
 
 
 class InvParametricRelu(InvLeakyRelu):

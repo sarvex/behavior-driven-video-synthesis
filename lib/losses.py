@@ -38,7 +38,7 @@ def latent_kl(prior_mean, posterior_mean):
 
 
 def aggregate_kl_loss(prior_means, posterior_means):
-    kl_loss = torch.sum(
+    return torch.sum(
         torch.cat(
             [
                 latent_kl(p, q).unsqueeze(dim=-1)
@@ -49,11 +49,10 @@ def aggregate_kl_loss(prior_means, posterior_means):
             dim=-1,
         )
     )
-    return kl_loss
 
 
 def compute_kl_loss(prior_means, posterior_means):
-    kl_loss = torch.sum(
+    return torch.sum(
         torch.cat(
             [
                 latent_kl(p, q).unsqueeze(dim=-1)
@@ -62,20 +61,20 @@ def compute_kl_loss(prior_means, posterior_means):
             dim=-1,
         )
     )
-    return kl_loss
 
 
 def compute_kl_with_prior(means, logstds):
-    kl_out = torch.mean(
+    return torch.mean(
         torch.cat(
             [
-                kl_loss(m.reshape(m.size(0),-1), l.reshape(l.size(0),-1)).unsqueeze(dim=-1)
+                kl_loss(
+                    m.reshape(m.size(0), -1), l.reshape(l.size(0), -1)
+                ).unsqueeze(dim=-1)
                 for m, l in zip(means, logstds)
             ],
             dim=-1,
         )
     )
-    return kl_out
 
 
 def vgg_loss(custom_vgg, target, pred, weights=None):
@@ -99,7 +98,7 @@ def vgg_loss(custom_vgg, target, pred, weights=None):
             loss = get_member(custom_vgg, "loss_weights")[i] * torch.mean(
                 torch.abs(tf - pf)
             ).unsqueeze(dim=-1)
-            losses.update({names[i]: loss})
+            losses[names[i]] = loss
     else:
 
         losses = {
@@ -114,7 +113,7 @@ def vgg_loss(custom_vgg, target, pred, weights=None):
                 torch.abs(tf - pf)
             ).unsqueeze(dim=-1)
 
-            losses.update({names[i + 1]: loss})
+            losses[names[i + 1]] = loss
 
     return losses
 
@@ -173,7 +172,7 @@ class SequentialDiscLoss(nn.Module):
         else:
             self.loss = None
 
-        assert self.loss_type in ["bce", "mse", "hinge"]
+        assert self.loss_type in {"bce", "mse", "hinge"}
 
     def forward(self, pred, target, mode="real"):
         if self.loss_type in ["bce", "mse"]:
@@ -198,12 +197,12 @@ class MILoss:
 
         n_layer = (
             kwargs["n_layer_c"]
-            if not "n_layer_midisc" in kwargs
+            if "n_layer_midisc" not in kwargs
             else kwargs["n_layer_midisc"]
         )
         nf_hidden = (
             kwargs["dim_hidden_c"]
-            if not "nf_hidden_midisc" in kwargs
+            if "nf_hidden_midisc" not in kwargs
             else kwargs["nf_hidden_midisc"]
         )
         if hasattr(kwargs, "conv_midisc") and kwargs.conv_midisc:
@@ -239,18 +238,18 @@ class MILoss:
 
         disc_marg = self.disc(zb_marg).squeeze()
         marg_p = torch.mean(self.sigm(disc_marg))
-        out_dict.update({"mi_fake_p": marg_p.item()})
+        out_dict["mi_fake_p"] = marg_p.item()
 
         loss_joint = (
             self.loss(disc_joint, torch.ones_like(disc_joint)) / seq_len
         )
         loss_marg = self.loss(disc_marg, torch.zeros_like(disc_marg))
 
-        out_dict.update({"mi_disc_loss_joint": loss_joint.item()})
-        out_dict.update({"mi_disc_loss_marg": loss_marg.item()})
+        out_dict["mi_disc_loss_joint"] = loss_joint.item()
+        out_dict["mi_disc_loss_marg"] = loss_marg.item()
 
         loss = loss_joint + loss_marg
-        out_dict.update({"mi_disc_loss": loss.item()})
+        out_dict["mi_disc_loss"] = loss.item()
 
         loss.backward(retain_graph=True)
         self.disc_opt.step()

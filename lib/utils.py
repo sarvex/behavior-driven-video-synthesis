@@ -35,11 +35,7 @@ def n_parameters(model):
 
 
 def get_member(model, name):
-    if isinstance(model, nn.DataParallel):
-        module = model.module
-    else:
-        module = model
-
+    module = model.module if isinstance(model, nn.DataParallel) else model
     return getattr(module, name)
 
 
@@ -129,8 +125,7 @@ def t5p(kps, jm: JointModel, wh, oh):
         )
     )
 
-    T = cv2.getPerspectiveTransform(points_src, points_dst)
-    return T
+    return cv2.getPerspectiveTransform(points_src, points_dst)
 
 
 def t4p(kps, jm: JointModel, wh, oh):
@@ -142,9 +137,7 @@ def t4p(kps, jm: JointModel, wh, oh):
         np.asarray(wh, dtype=np.float32),
     )
 
-    T = cv2.getPerspectiveTransform(points_src, points_dst)
-
-    return T
+    return cv2.getPerspectiveTransform(points_src, points_dst)
 
 
 def t3p(kps, jm: JointModel, wh, oh):
@@ -187,9 +180,7 @@ def t3p(kps, jm: JointModel, wh, oh):
     wh = np.asarray(wh, dtype=np.float32)
     points_dst = np.multiply(dst, wh)
 
-    T = cv2.getPerspectiveTransform(points_src, points_dst)
-
-    return T
+    return cv2.getPerspectiveTransform(points_src, points_dst)
 
 
 def t2p(kps, ids: tuple, wh, oh, jm=None):
@@ -227,9 +218,7 @@ def t2p(kps, ids: tuple, wh, oh, jm=None):
     wh = np.asarray(wh, dtype=np.float32)
     points_dst = np.multiply(dst, wh) - 1.0
 
-    T = cv2.getPerspectiveTransform(points_src, points_dst)
-
-    return T
+    return cv2.getPerspectiveTransform(points_src, points_dst)
 
 
 def get_img_crop(img_batch, target_kps, name, spatial_size, box_factor):
@@ -338,10 +327,7 @@ def make_joint_img(
     )
     thickness = scale_factor
 
-    imgs = list()
-    for i in range(3):
-        imgs.append(np.zeros(img_shape[:2], dtype="uint8"))
-
+    imgs = [np.zeros(img_shape[:2], dtype="uint8") for _ in range(3)]
     if len(joint_model.body) > 2:
         body_pts = np.array([[joints[part, :] for part in joint_model.body]])
         valid_pts = np.all(np.greater_equal(body_pts, [0.0, 0.0]), axis=-1)
@@ -461,48 +447,44 @@ def make_joint_img(
                         thickness=thickness,
                     )
 
-        if throat_lens.size > 0:
-            throat_len = np.amax(throat_lens)
-        else:
-            throat_len = 0
+        throat_len = np.amax(throat_lens) if throat_lens.size > 0 else 0
     if len(joint_model.face) > 0:
         for line_nr, line in enumerate(joint_model.face):
 
             valid_pts = np.greater_equal(joints[line, :], [0.0, 0.0])
-            if np.all(valid_pts):
-                if (
-                    np.linalg.norm(joints[line[0], :] - joints[line[1], :])
-                    < throat_len
-                ):
-                    a = tuple(np.int_(joints[line[0], :]))
-                    b = tuple(np.int_(joints[line[1], :]))
-                    if color_channel is None:
-                        if line_colors is not None:
-                            channel = int(
-                                np.nonzero(line_colors[2][line_nr])[0]
-                            )
-                            cv2.line(
-                                imgs[channel],
-                                a,
-                                b,
-                                color=line_colors[2][line_nr][channel],
-                                thickness=thickness,
-                            )
-                        else:
-                            cv2.line(
-                                imgs[0], a, b, color=127, thickness=thickness
-                            )
-                            cv2.line(
-                                imgs[1], a, b, color=127, thickness=thickness
-                            )
-                    else:
+            if np.all(valid_pts) and (
+                np.linalg.norm(joints[line[0], :] - joints[line[1], :])
+                < throat_len
+            ):
+                a = tuple(np.int_(joints[line[0], :]))
+                b = tuple(np.int_(joints[line[1], :]))
+                if color_channel is None:
+                    if line_colors is not None:
+                        channel = int(
+                            np.nonzero(line_colors[2][line_nr])[0]
+                        )
                         cv2.line(
-                            imgs[color_channel],
+                            imgs[channel],
                             a,
                             b,
-                            color=255,
+                            color=line_colors[2][line_nr][channel],
                             thickness=thickness,
                         )
+                    else:
+                        cv2.line(
+                            imgs[0], a, b, color=127, thickness=thickness
+                        )
+                        cv2.line(
+                            imgs[1], a, b, color=127, thickness=thickness
+                        )
+                else:
+                    cv2.line(
+                        imgs[color_channel],
+                        a,
+                        b,
+                        color=255,
+                        thickness=thickness,
+                    )
 
 
     img = np.stack(imgs, axis=-1)
@@ -677,7 +659,7 @@ def add_summary_writer(net, path):
     try:
         writer.add_graph(net)
     except Exception as ex:
-        print("Failed to add graph to generator: {}".format(ex))
+        print(f"Failed to add graph to generator: {ex}")
 
     return writer
 
@@ -709,11 +691,9 @@ def make_img_grid(img_list):
     )
 
     stacked = torch.cat(img_list, dim=0)
-    grid = make_grid(
+    return make_grid(
         stacked, nrow=int(stacked.shape[0] // l), padding=10
     ).unsqueeze(dim=0)
-
-    return grid
 
 
 def set_np_random_seed():
@@ -793,13 +773,10 @@ def parallel_data_prefetch(
     elif isinstance(data, abc.Iterable):
         if isinstance(data, dict):
             print(
-                f'WARNING:"data" argument passed to parallel_data_prefetch is a dict: Using only its values and disregarding keys.'
+                'WARNING:"data" argument passed to parallel_data_prefetch is a dict: Using only its values and disregarding keys.'
             )
             data = list(data.values())
-        if target_data_type == "ndarray":
-            data = np.asarray(data)
-        else:
-            data = list(data)
+        data = np.asarray(data) if target_data_type == "ndarray" else list(data)
     else:
         raise TypeError(
             f"The data, that shall be processed parallel has to be either an np.ndarray or an Iterable, but is actually {type(data)}."
@@ -822,7 +799,7 @@ def parallel_data_prefetch(
         arguments = [
             [func, Q, part, i]
             for i, part in enumerate(
-                [data[i : i + step] for i in range(0, len(data), step)]
+                data[i : i + step] for i in range(0, len(data), step)
             )
         ]
     processes = []
@@ -831,7 +808,7 @@ def parallel_data_prefetch(
         processes += [p]
 
     # start processes
-    print(f"Start prefetching...")
+    print("Start prefetching...")
     import time
 
     start = time.time()
@@ -929,8 +906,9 @@ class AverageNIterations(Average):
 
     def compute(self):
         if self.num_examples < 1:
-            raise RuntimeError("{} must have at least one example before"
-                                     " it can be computed.".format(self.__class__.__name__))
+            raise RuntimeError(
+                f"{self.__class__.__name__} must have at least one example before it can be computed."
+            )
 
         return self.accumulator / self.num_examples
 

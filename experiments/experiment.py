@@ -46,10 +46,8 @@ class Experiment:
 
                 # load latest stored checkpoint
                 ckpts = [ckpt for ckpt in ckpts if key in ckpt.split("/")[-1]]
-                if len(ckpts) == 0:
-                    print(
-                        RED + f"*************No ckpt found****************" + ENDC
-                    )
+                if not ckpts:
+                    print(f"{RED}*************No ckpt found****************{ENDC}")
                     op_ckpt = mod_ckpt = None
                     return mod_ckpt, op_ckpt
                 ckpts = {float(x.split("_")[-1].split(".")[0]): x for x in ckpts}
@@ -91,8 +89,6 @@ class Experiment:
                     )
             else:
                 mod_ckpt = op_ckpt = None
-
-            return mod_ckpt, op_ckpt
 
         else:
             ckpt_path = path.join(dir,name)
@@ -142,7 +138,8 @@ class Experiment:
                         + ENDC
                     )
 
-            return mod_ckpt,op_ckpt
+
+        return mod_ckpt, op_ckpt
 
 
     @staticmethod

@@ -107,9 +107,7 @@ class GroupGRUCell(nn.Module):
         inputgate = torch.sigmoid(i_i + h_i)
         newgate = torch.tanh(i_n + (resetgate * h_n))
 
-        hy = newgate + inputgate * (hidden - newgate)
-
-        return hy
+        return newgate + inputgate * (hidden - newgate)
 
 
 class RIMCell(nn.Module):
@@ -148,14 +146,11 @@ class RIMCell(nn.Module):
 
         if self.rnn_cell == 'GRU':
             self.rnn = GroupGRUCell(input_value_size, hidden_size, num_units)
-            self.query = GroupLinearLayer(hidden_size,
-                                          input_key_size * num_input_heads,
-                                          self.num_units)
         else:
             self.rnn = GroupLSTMCell(input_value_size, hidden_size, num_units)
-            self.query = GroupLinearLayer(hidden_size,
-                                          input_key_size * num_input_heads,
-                                          self.num_units)
+        self.query = GroupLinearLayer(hidden_size,
+                                      input_key_size * num_input_heads,
+                                      self.num_units)
         self.query_ = GroupLinearLayer(hidden_size,
                                        comm_query_size * num_comm_heads,
                                        self.num_units)
@@ -275,9 +270,6 @@ class RIMCell(nn.Module):
         if cs is not None:
             c_old = cs * 1.0
 
-        # Compute RNN(LSTM or GRU) output
-
-        if cs is not None:
             hs, cs = self.rnn(inputs, (hs, cs))
         else:
             hs = self.rnn(inputs, hs)
@@ -335,9 +327,7 @@ class RIM(nn.Module):
         xs = list(torch.split(x, 1, dim=0))
         if direction == 1: xs.reverse()
         hs = h.squeeze(0).view(batch_size, self.num_units, -1)
-        cs = None
-        if c is not None:
-            cs = c.squeeze(0).view(batch_size, self.num_units, -1)
+        cs = None if c is None else c.squeeze(0).view(batch_size, self.num_units, -1)
         outputs = []
         for x in xs:
             x = x.squeeze(0)

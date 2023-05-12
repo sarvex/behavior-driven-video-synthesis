@@ -30,7 +30,7 @@ class H36M_Metadata:
         self.camera_ids = [elem.text for elem in root.find('dbcameras/index2id')]
 
     def get_base_filename(self, subject, action, subaction, camera):
-        return '{}.{}'.format(self.sequence_mappings[subject][(action, subaction)], camera)
+        return f'{self.sequence_mappings[subject][action, subaction]}.{camera}'
 
 
 def load_h36m_metadata():

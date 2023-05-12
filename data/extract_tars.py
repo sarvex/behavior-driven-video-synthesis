@@ -13,10 +13,7 @@ subjects = ['S1', 'S5', 'S6', 'S7', 'S8', 'S9', 'S11']
 def commonprefix(m):
     s1 = min(m)
     s2 = max(m)
-    for i, c in enumerate(s1):
-        if c != s2[i]:
-            return s1[:i]
-    return s1
+    return next((s1[:i] for i, c in enumerate(s1) if c != s2[i]), s1)
 
 
 def extract_tgz(tgz_file, dest):
@@ -32,13 +29,16 @@ def extract_tgz(tgz_file, dest):
 
 
 def extract_all():
-  for subject_id in tqdm(subjects, ascii=True):
-      out_dir = path.join('extracted', subject_id)
-      makedirs(out_dir, exist_ok=True)
-      extract_tgz('archives/Poses_D3_Positions_mono_universal_{}.tgz'.format(subject_id),
-                  path.join(out_dir, 'Poses_D3_Positions_mono_universal')),
-      extract_tgz('archives/Videos_{}.tgz'.format(subject_id),
-                  path.join(out_dir, 'Videos'))
+    for subject_id in tqdm(subjects, ascii=True):
+        out_dir = path.join('extracted', subject_id)
+        makedirs(out_dir, exist_ok=True)
+        (
+            extract_tgz(
+                f'archives/Poses_D3_Positions_mono_universal_{subject_id}.tgz',
+                path.join(out_dir, 'Poses_D3_Positions_mono_universal'),
+            ),
+        )
+        extract_tgz(f'archives/Videos_{subject_id}.tgz', path.join(out_dir, 'Videos'))
 
 
 if __name__ == '__main__':

@@ -31,7 +31,7 @@ class VunetOrg(nn.Module):
         self.n_scales_x = (
             self.n_scales - kwargs["box_factor"] if n_channels_x > 3 else self.n_scales
         )
-        dropout_prob = kwargs["dropout_prob"] if "dropout_prob" in kwargs else 0.
+        dropout_prob = kwargs.get("dropout_prob", 0.)
         self.n_channels_x = n_channels_x
         n_latent_scales = kwargs["n_latent_scales"]
         if kwargs["conv_layer_type"] == "l1":
@@ -43,7 +43,7 @@ class VunetOrg(nn.Module):
         else:
             raise NotImplementedError("No conv layers others than l1 and l2 normalized ones are available.")
 
-        print("Vunet using " + conv_t + " as conv layers.")
+        print(f"Vunet using {conv_t} as conv layers.")
         self.eu = EncUp(
             self.n_scales_x,
             n_filters=kwargs["nf_start"],  # 64
@@ -107,7 +107,7 @@ class VunetOrg(nn.Module):
 
 
 class EncUp(nn.Module):
-    def     __init__(
+    def __init__(
         self, n_scales, n_filters, max_filters, nf_in=3, conv_layer=NormConv2d, dropout_prob=0.
     ):
         super().__init__()
@@ -122,7 +122,7 @@ class EncUp(nn.Module):
         self.downs = nn.ModuleList()
         nf = n_filters
         for i in range(self.n_scales):
-            for n in range(self.n_rnb):
+            for _ in range(self.n_rnb):
                 self.blocks.append(VunetRNB(channels=nf, conv_layer=conv_layer,dropout_prob=dropout_prob))
 
             if i + 1 < self.n_scales:
@@ -166,9 +166,8 @@ class EncDown(nn.Module):
         self.ups = nn.ModuleList()
         self.make_latent_params = nn.ModuleList()
         nf = n_filters
-        for i in range(self.n_scales):
-
-            for n in range(self.n_rnb // 2):
+        for _ in range(self.n_scales):
+            for _ in range(self.n_rnb // 2):
                 self.blocks.append(
                     VunetRNB(channels=nf, a_channels=nf, residual=True,dropout_prob=dropout_prob)
                 )
@@ -177,7 +176,7 @@ class EncDown(nn.Module):
                 conv_layer(nf, nf, kernel_size=3, padding=1)
             )
 
-            for n in range(self.n_rnb // 2):
+            for _ in range(self.n_rnb // 2):
                 self.blocks.append(
                     VunetRNB(channels=nf, a_channels=2 * nf, residual=True,dropout_prob=dropout_prob)
                 )
@@ -235,7 +234,7 @@ class DecUp(nn.Module):
         self.downs = nn.ModuleList()
         nf = n_filters
         for i in range(self.n_scales):
-            for n in range(self.n_rnb):
+            for _ in range(self.n_rnb):
                 self.blocks.append(VunetRNB(channels=nf, conv_layer=conv_layer,dropout_prob=dropout_prob))
 
             if i + 1 < self.n_scales:
@@ -295,7 +294,7 @@ class DecDownAlter(nn.Module):
         nf = nf_in
         for i in range(self.n_scales):
 
-            for n in range(self.n_rnb // 2):
+            for _ in range(self.n_rnb // 2):
                 self.blocks.append(
                     VunetRNB(
                         channels=nf,
@@ -309,7 +308,7 @@ class DecDownAlter(nn.Module):
             if i < self.n_latent_scales:
                 self.auto_blocks.append(VunetRNB(channels=nf,a_channels=nf,residual=True,conv_layer=conv_layer,dropout_prob=dropout_prob))
 
-            for n in range(self.n_rnb // 2):
+            for _ in range(self.n_rnb // 2):
                 self.blocks.append(
                     VunetRNB(
                         channels=nf,
@@ -322,10 +321,7 @@ class DecDownAlter(nn.Module):
 
             if i + 1 < self.n_scales:
                 out_c = min(nf_in, nf_last * 2 ** (n_scales - (i + 2)))
-                if subpixel_upsampling:
-                    subpixel = True
-                else:
-                    subpixel = True if i < self.n_latent_scales else False
+                subpixel = True if subpixel_upsampling else i < self.n_latent_scales
                 self.ups.append(Upsample(nf, out_c, subpixel=subpixel))
                 nf = out_c
 
@@ -346,61 +342,53 @@ class DecDownAlter(nn.Module):
 
             if i < self.n_latent_scales:
 
-                if training:
-                    from_dist = zs_posterior.pop(0)
-                else:
-                    from_dist = torch.randn_like(h)
-
+                from_dist = zs_posterior.pop(0) if training else torch.randn_like(h)
                 h = self.auto_blocks[lat_count](h,from_dist)
                 # hs.append(h)
                 lat_count+=1
-                # scale = f"l_{i}"
-                # if training:
-                #     zs_posterior_groups = self.__split_groups(zs_posterior[0])
-                # p_groups = []
-                # z_groups = []
-                # pre = self.auto_blocks[scale][0](h)
-                # p_features = self.space_to_depth(pre)
-                #
-                # for l in range(4):
-                #     p_group = self.auto_lp[scale][l](p_features)
-                #     p_groups.append(p_group)
-                #     prior_s = torch.randn_like(p_group)
-                #     z_groups.append(prior_s)
-                #
-                #
-                #
-                #     if training:
-                #         feedback = zs_posterior_groups.pop(0)
-                #     else:
-                #         feedback = prior_s
-                #
-                #     if l + 1 < 4:
-                #         p_features = self.auto_blocks[scale][l + 1](
-                #             p_features, feedback
-                #         )
-                # if training:
-                #     assert not zs_posterior_groups
-                #
-                # p = self.__merge_groups(p_groups)
-                # ps.append(p)
-                #
-                # z_prior = self.__merge_groups(z_groups)
-                # zs.append(z_prior)
-                #
-                # if training:
-                #     z = zs_posterior.pop(0)
-                # else:
-                #     z = z_prior
-                #
-                # h = torch.cat([h, z], dim=1)
-                # h = self.latent_nins[scale](h)
-                h = self.blocks[2 * i + 1](h, gs.pop())
-                hs.append(h)
-            else:
-                h = self.blocks[2 * i + 1](h, gs.pop())
-                hs.append(h)
-
+            # scale = f"l_{i}"
+            # if training:
+            #     zs_posterior_groups = self.__split_groups(zs_posterior[0])
+            # p_groups = []
+            # z_groups = []
+            # pre = self.auto_blocks[scale][0](h)
+            # p_features = self.space_to_depth(pre)
+            #
+            # for l in range(4):
+            #     p_group = self.auto_lp[scale][l](p_features)
+            #     p_groups.append(p_group)
+            #     prior_s = torch.randn_like(p_group)
+            #     z_groups.append(prior_s)
+            #
+            #
+            #
+            #     if training:
+            #         feedback = zs_posterior_groups.pop(0)
+            #     else:
+            #         feedback = prior_s
+            #
+            #     if l + 1 < 4:
+            #         p_features = self.auto_blocks[scale][l + 1](
+            #             p_features, feedback
+            #         )
+            # if training:
+            #     assert not zs_posterior_groups
+            #
+            # p = self.__merge_groups(p_groups)
+            # ps.append(p)
+            #
+            # z_prior = self.__merge_groups(z_groups)
+            # zs.append(z_prior)
+            #
+            # if training:
+            #     z = zs_posterior.pop(0)
+            # else:
+            #     z = z_prior
+            #
+            # h = torch.cat([h, z], dim=1)
+            # h = self.latent_nins[scale](h)
+            h = self.blocks[2 * i + 1](h, gs.pop())
+            hs.append(h)
             if i + 1 < self.n_scales:
                 h = self.ups[i](h)
 
@@ -408,10 +396,7 @@ class DecDownAlter(nn.Module):
         if training:
             assert not zs_posterior
 
-        params = self.out_conv(hs[-1])
-
-        # returns imgs, activations, prior params and samples
-        return params
+        return self.out_conv(hs[-1])
 
 
     def __split_groups(self, x):
@@ -441,7 +426,7 @@ class VunetAlter(nn.Module):
         )
         self.n_channels_x = n_channels_x
         n_latent_scales = kwargs["n_latent_scales"]
-        dropout_prob = kwargs["dropout_prob"] if "dropout_prob" in kwargs else 0.
+        dropout_prob = kwargs.get("dropout_prob", 0.)
         if kwargs["conv_layer_type"] == "l1":
             conv_layer = NormConv2d
             conv_t = "L1NormConv2d"
@@ -452,7 +437,7 @@ class VunetAlter(nn.Module):
             conv_layer = LayerNormConv2d
             conv_t = "LayerNormConv2d"
 
-        print("Vunet using " + conv_t + " as conv layers.")
+        print(f"Vunet using {conv_t} as conv layers.")
         self.eu = EncUp(
             self.n_scales_x,
             n_filters=kwargs["nf_start"],  # 64
@@ -502,8 +487,7 @@ class VunetAlter(nn.Module):
     def test_forward(self, c):
         # sample appearance
         gs = self.du(c)
-        imgs = self.dd(gs, [], training=False)
-        return imgs
+        return self.dd(gs, [], training=False)
 
     def transfer(self, x, c):
         hs = self.eu(x)
@@ -511,8 +495,7 @@ class VunetAlter(nn.Module):
         zs_mean = list(means)
 
         gs = self.du(c)
-        imgs = self.dd(gs, zs_mean, training=True)
-        return imgs
+        return self.dd(gs, zs_mean, training=True)
 
 
 
@@ -528,9 +511,8 @@ class EncDownAlter(nn.Module):
         self.make_latent_params = nn.ModuleList()
         self.make_logstds = nn.ModuleList()
         nf = n_filters
-        for i in range(self.n_scales):
-
-            for n in range(self.n_rnb // 2):
+        for _ in range(self.n_scales):
+            for _ in range(self.n_rnb // 2):
                 self.blocks.append(
                     VunetRNB(channels=nf, a_channels=nf, residual=True,dropout_prob=dropout_prob)
                 )
@@ -543,7 +525,7 @@ class EncDownAlter(nn.Module):
                 conv_layer(nf, nf, kernel_size=3, padding=1)
             )
 
-            for n in range(self.n_rnb // 2):
+            for _ in range(self.n_rnb // 2):
                 self.blocks.append(
                     VunetRNB(channels=nf, a_channels=2 * nf, residual=True)
                 )
@@ -630,7 +612,7 @@ class DecDown(nn.Module):
         nf = nf_in
         for i in range(self.n_scales):
 
-            for n in range(self.n_rnb // 2):
+            for _ in range(self.n_rnb // 2):
                 self.blocks.append(
                     VunetRNB(
                         channels=nf,
@@ -681,7 +663,7 @@ class DecDown(nn.Module):
                 self.auto_lp.update({scale: clp})
                 self.auto_blocks.update({scale: cb})
 
-            for n in range(self.n_rnb // 2):
+            for _ in range(self.n_rnb // 2):
                 self.blocks.append(
                     VunetRNB(
                         channels=nf,
@@ -694,10 +676,7 @@ class DecDown(nn.Module):
 
             if i + 1 < self.n_scales:
                 out_c = min(nf_in, nf_last * 2 ** (n_scales - (i + 2)))
-                if subpixel_upsampling:
-                    subpixel = True
-                else:
-                    subpixel = True if i < self.n_latent_scales else False
+                subpixel = True if subpixel_upsampling else i < self.n_latent_scales
                 self.ups.append(Upsample(nf, out_c, subpixel=subpixel))
                 nf = out_c
 
@@ -730,12 +709,8 @@ class DecDown(nn.Module):
                     z_group = latent_sample(p_group)
                     z_groups.append(z_group)
 
-                    if training:
-                        feedback = zs_posterior_groups.pop(0)
-                    else:
-                        feedback = z_group
-
-                    if l + 1 < 4:
+                    feedback = zs_posterior_groups.pop(0) if training else z_group
+                    if l < 3:
                         p_features = self.auto_blocks[scale][l + 1](
                             p_features, feedback
                         )
@@ -748,19 +723,11 @@ class DecDown(nn.Module):
                 z_prior = self.__merge_groups(z_groups)
                 zs.append(z_prior)
 
-                if training:
-                    z = zs_posterior.pop(0)
-                else:
-                    z = z_prior
-
+                z = zs_posterior.pop(0) if training else z_prior
                 h = torch.cat([h, z], dim=1)
                 h = self.latent_nins[scale](h)
-                h = self.blocks[2 * i + 1](h, gs.pop())
-                hs.append(h)
-            else:
-                h = self.blocks[2 * i + 1](h, gs.pop())
-                hs.append(h)
-
+            h = self.blocks[2 * i + 1](h, gs.pop())
+            hs.append(h)
             if i + 1 < self.n_scales:
                 h = self.ups[i](h)
 
@@ -809,10 +776,10 @@ class Regressor(nn.Module):
 
 
     def forward(self, embeddings:list):
-        out = []
-        for e, embedder in zip(reversed(embeddings),self.embedders):
-           out.append(self.act_fn(embedder(e)).squeeze(dim=-1).squeeze(dim=-1))
-
+        out = [
+            self.act_fn(embedder(e)).squeeze(dim=-1).squeeze(dim=-1)
+            for e, embedder in zip(reversed(embeddings), self.embedders)
+        ]
         out = torch.cat(out,dim=-1)
 
         for i in range(self.n_linear):

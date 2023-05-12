@@ -105,16 +105,14 @@ class MTVAEModel(Experiment):
     def run_training(self):
 
         ########## init wandb ###########
-        print(GREEN + "*************** START TRAINING *******************")
+        print(f"{GREEN}*************** START TRAINING *******************")
 
         # fixme check if this works
         for (key, val) in self.config.items():
-            print(GREEN + f"{key}: {val}")  # print to console
+            print(f"{GREEN}{key}: {val}")
             wandb.config.update({key: val})  # update wandb config
 
-        print(
-            GREEN + "**************************************************" + ENDC
-        )
+        print(f"{GREEN}**************************************************{ENDC}")
 
         ########## checkpoints ##########
         if self.config["general"]["restart"]:
@@ -169,10 +167,14 @@ class MTVAEModel(Experiment):
         )
 
         # test data
-        t_datakeys = [key for key in self.data_keys] + ["action", "sample_ids", "intrinsics",
-                                                        "intrinsics_paired",
-                                                        "extrinsics",
-                                                        "extrinsics_paired", ]
+        t_datakeys = list(self.data_keys) + [
+            "action",
+            "sample_ids",
+            "intrinsics",
+            "intrinsics_paired",
+            "extrinsics",
+            "extrinsics_paired",
+        ]
         test_dataset = dataset(
             image_transforms,
             data_keys=t_datakeys,
@@ -248,23 +250,17 @@ class MTVAEModel(Experiment):
             "Number of parameters in VAE model",
             sum(p.numel() for p in net.parameters()),
         )
-        if self.config["general"]["restart"]:
-            if mod_ckpt is not None:
-                print(
-                    BLUE
-                    + f"***** Initializing VAE from checkpoint! *****"
-                    + ENDC
-                )
-                net.load_state_dict(mod_ckpt)
+        if self.config["general"]["restart"] and mod_ckpt is not None:
+            print(f"{BLUE}***** Initializing VAE from checkpoint! *****{ENDC}")
+            net.load_state_dict(mod_ckpt)
         net.to(self.device)
 
         optimizer = Adam(
             net.parameters(), lr=self.config["training"]["lr_init"], weight_decay=self.config["training"]["weight_decay"]
         )
         wandb.watch(net, log="all", log_freq=len(train_loader))
-        if self.config["general"]["restart"]:
-            if op_ckpt is not None:
-                optimizer.load_state_dict(op_ckpt)
+        if self.config["general"]["restart"] and op_ckpt is not None:
+            optimizer.load_state_dict(op_ckpt)
         # scheduler = torch.optim.lr_scheduler.MultiStepLR(
         #     optimizer, milestones=self.config["training"]["tau"], gamma=self.config["training"]["gamma"]
         # )
@@ -325,7 +321,7 @@ class MTVAEModel(Experiment):
             kl_weight = get_kl_weight(engine.state.iteration)
 
             loss = kps_loss + kl_weight * l_kl + self.config["training"]["weight_motion"] * motion_loss \
-                   + self.config["training"]["weight_cycle"] * cycle_loss
+                       + self.config["training"]["weight_cycle"] * cycle_loss
 
             #
             #
@@ -469,8 +465,8 @@ class MTVAEModel(Experiment):
             )
             for key in engine.state.metrics:
                 val = engine.state.metrics[key]
-                wandb.log({key + "-epoch-avg": val})
-                print(ENDC + f" [metrics] {key}:{val}")
+                wandb.log({f"{key}-epoch-avg": val})
+                print(f"{ENDC} [metrics] {key}:{val}")
 
 
 
@@ -483,8 +479,8 @@ class MTVAEModel(Experiment):
 
             loss_avg = engine.state.metrics["loss"]
 
-            print(GREEN + f"Epoch {engine.state.epoch} summary:")
-            print(ENDC + f" [losses] loss overall:{loss_avg}")
+            print(f"{GREEN}Epoch {engine.state.epoch} summary:")
+            print(f"{ENDC} [losses] loss overall:{loss_avg}")
 
         def eval_model(engine):
             eval_nets(
@@ -495,6 +491,7 @@ class MTVAEModel(Experiment):
                 cf_action_beta=classifier_beta,
                 debug=self.config["general"]["debug"]
             )
+
         #
         #
         def transfer_behavior_test(engine):
@@ -548,7 +545,7 @@ class MTVAEModel(Experiment):
         def log_outputs(engine):
             for key in engine.state.output:
                 val = engine.state.output[key]
-                wandb.log({key + "-epoch-step": val})
+                wandb.log({f"{key}-epoch-step": val})
 
         trainer.add_event_handler(Events.ITERATION_COMPLETED(every=10 if self.config["general"]["debug"] else 1000),log_outputs)
         trainer.add_event_handler(

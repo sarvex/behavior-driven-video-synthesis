@@ -104,8 +104,7 @@ class MarketDataset(BaseDataset):
         good = True
         joints = self.data["joints"][i]
         joints = np.float32(joints[self.joint_model.body])
-        good = good and valid_joints(joints)
-        return good
+        return good and valid_joints(joints)
 
     def __len__(self):
         return self.datadict["img_paths"].shape[0]
@@ -182,8 +181,9 @@ if __name__ == '__main__':
 
         grid = {key: np.concatenate(list(imgs[key]), axis=1) for key in imgs if
                 key != "app_img"}
-        grid.update({"overlay": cv2.addWeighted(grid["pose_img"], 0.5,
-                                                grid["stickman"], 0.5, 0)})
+        grid["overlay"] = cv2.addWeighted(
+            grid["pose_img"], 0.5, grid["stickman"], 0.5, 0
+        )
 
         grid = np.concatenate([grid[key] for key in grid], axis=0)
         grid = cv2.cvtColor(grid, cv2.COLOR_RGB2BGR)

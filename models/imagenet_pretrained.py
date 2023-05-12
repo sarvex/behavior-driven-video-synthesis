@@ -102,7 +102,7 @@ class FIDInceptionModel(nn.Module):
             x = submodule(x)
             if name == "Mixed_7c":
                 break
-            elif name == "Conv2d_4a_3x3" or name == "Conv2d_2b_3x3":
+            elif name in ["Conv2d_4a_3x3", "Conv2d_2b_3x3"]:
                 x = F.avg_pool2d(x, kernel_size=3, stride=2)
 
         out = F.adaptive_avg_pool2d(x, (1, 1))

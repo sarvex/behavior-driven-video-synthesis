@@ -79,7 +79,7 @@ class Decoder(nn.Module):
 
         # build encoder
         dec = nn.ModuleList()
-        for k in range(n_layer):
+        for _ in range(n_layer):
             dec_tmp = nn.Linear(n_in, dim_hidden)
             torch.nn.init.xavier_uniform_(dec_tmp.weight)
             dec.append(dec_tmp)
@@ -104,7 +104,7 @@ class CEncoder(nn.Module):
 
         # build encoder
         enc = nn.ModuleList()
-        for k in range(n_layers):
+        for _ in range(n_layers):
             enc_tmp = nn.Linear(n_in, dim_hidden)
             torch.nn.init.xavier_uniform_(enc_tmp.weight)
             enc.append(enc_tmp)
@@ -193,10 +193,7 @@ class BEncoder(nn.Module):
                 .squeeze(dim=-1)
                 .squeeze(dim=-1)
             )
-            if sample:
-                out = self._sample(mu)
-            else:
-                out = self.reparametrize(mu, logstd)
+            out = self._sample(mu) if sample else self.reparametrize(mu, logstd)
             return (out, mu, logstd, pre)
 
         return pre
@@ -305,11 +302,7 @@ class MTVAE(nn.Module):
         mu = params[:,:int(params.size(1)/2)]
         logstd = params[:, int(params.size(1) / 2):]
 
-        if sample_prior:
-            z = torch.randn_like(mu)
-        else:
-            z = self.reparametrize(mu,logstd)
-
+        z = torch.randn_like(mu) if sample_prior else self.reparametrize(mu,logstd)
         #latent decoder
         inv_z = self.inv_z(z)
         if transfer:
@@ -403,7 +396,7 @@ class RNNDecoder(nn.Module):
 
             # build encoder
             dec = nn.ModuleList()
-            for k in range(n_layers_lin):
+            for _ in range(n_layers_lin):
                 enc_tmp = nn.Linear(n_in, dim_hidden_lin)
                 torch.nn.init.xavier_uniform_(enc_tmp.weight)
                 dec.append(enc_tmp)
@@ -452,11 +445,7 @@ class RNNDecoder(nn.Module):
     def forward(self, x):
 
         out, self.hidden = self.rnn(x, self.hidden)
-        if self.use_linear:
-            out = self.dec(out.squeeze(dim=1))
-        else:
-            out = out.squeeze(dim=1)
-
+        out = self.dec(out.squeeze(dim=1)) if self.use_linear else out.squeeze(dim=1)
         return out
 
 
@@ -539,19 +528,9 @@ class ResidualBehaviorNet(nn.Module):
     def __init__(self, n_kps, **kwargs):
         super().__init__()
 
-        self.dec_type = (
-            kwargs["decoder_arch"] if "decoder_arch" in kwargs else "lstm"
-        )
-        self.use_nin_dec = (
-            kwargs["linear_in_decoder"]
-            if "linear_in_decoder" in kwargs
-            else False
-        )
-        self.ib = (
-            kwargs["information_bottleneck"]
-            if "information_bottleneck" in kwargs
-            else False
-        )
+        self.dec_type = kwargs.get("decoder_arch", "lstm")
+        self.use_nin_dec = kwargs.get("linear_in_decoder", False)
+        self.ib = kwargs.get("information_bottleneck", False)
         self.dim_hidden_b = kwargs["dim_hidden_b"]
         # (n_in, n_layers, dim_hidden, use_linear, dim_linear)
 
@@ -593,12 +572,7 @@ class ResidualBehaviorNet(nn.Module):
 
 
         self.b_enc.init_hidden(s.shape[0], device=s.get_device())
-        outs = self.b_enc(s, sample)
-        # if isinstance(outs, tuple) and not self.ib:
-        #     outs = outs[0]
-
-        # return only last element as this enc defines a many to one mapping
-        return outs
+        return self.b_enc(s, sample)
 
     def generate_seq(self, b, x_pose, len, start_frame):
         xs = []
@@ -612,8 +586,7 @@ class ResidualBehaviorNet(nn.Module):
             b.shape[0], device=b.get_device(), hidden=b, cell=b
         )
 
-        for i in range(len):
-
+        for _ in range(len):
             x, v = self.decoder(x)
 
             xs.append(x)

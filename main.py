@@ -9,8 +9,15 @@ from shutil import copy
 
 def create_dir_structure(config):
     subdirs = ["ckpt", "config", "generated", "log"]
-    structure = {subdir: path.join(config["base_dir"],config["experiment"],subdir,config["project_name"]) for subdir in subdirs}
-    return structure
+    return {
+        subdir: path.join(
+            config["base_dir"],
+            config["experiment"],
+            subdir,
+            config["project_name"],
+        )
+        for subdir in subdirs
+    }
 
 def load_parameters(config_name, restart,run_inference, debug, pretrained_model):
     with open(config_name,"r") as f:
@@ -23,20 +30,18 @@ def load_parameters(config_name, restart,run_inference, debug, pretrained_model)
     dir_structure = create_dir_structure(cdict["general"])
     saved_config = path.join(dir_structure["config"], "config.yaml")
     if restart:
-        if path.isfile(saved_config):
-            with open(saved_config,"r") as f:
-                cdict = yaml.load(f, Loader=yaml.FullLoader)
-        else:
+        if not path.isfile(saved_config):
             raise FileNotFoundError("No saved config file found but model is intended to be restarted. Aborting....")
 
+        with open(saved_config,"r") as f:
+            cdict = yaml.load(f, Loader=yaml.FullLoader)
     elif pretrained_model:
         pretrained_config = path.join(pretrained_model,'config.yaml')
-        if path.isfile(pretrained_config):
-            with open(pretrained_config,"r") as f:
-                cdict = yaml.load(f, Loader=yaml.FullLoader)
-        else:
+        if not path.isfile(pretrained_config):
             raise FileNotFoundError("No saved config file found but model is intended to be restarted. Aborting....")
 
+        with open(pretrained_config,"r") as f:
+            cdict = yaml.load(f, Loader=yaml.FullLoader)
         dir_structure = create_dir_structure(cdict["general"])
         [makedirs(dir_structure[d],exist_ok=True) for d in dir_structure]
         dump_path = path.join(dir_structure["config"], "config.yaml")
@@ -49,21 +54,24 @@ def load_parameters(config_name, restart,run_inference, debug, pretrained_model)
     else:
         [makedirs(dir_structure[d],exist_ok=True) for d in dir_structure]
         if path.isfile(saved_config) and not debug and not run_inference:
-            print(f"\033[93m" + "WARNING: Model has been started somewhen earlier: Resume training (y/n)?" + "\033[0m")
+            print(
+                f"\033[93mWARNING: Model has been started somewhen earlier: Resume training (y/n)?"
+                + "\033[0m"
+            )
             while True:
                 answer = input()
-                if answer == "y" or answer == "yes":
+                if answer in ["y", "yes"]:
                     with open(saved_config,"r") as f:
                         cdict = yaml.load(f, Loader=yaml.FullLoader)
 
                     restart = True
                     break
-                elif answer == "n" or answer == "no":
+                elif answer in ["n", "no"]:
                     with open(saved_config, "w") as f:
                         yaml.dump(cdict, f, default_flow_style=False)
                     break
                 else:
-                    print(f"\033[93m" + "Invalid answer! Try again!(y/n)" + "\033[0m")
+                    print(f"\033[93mInvalid answer! Try again!(y/n)" + "\033[0m")
         else:
             print(f'Load config saved at "{saved_config}"')
             with open(saved_config, "w") as f:
@@ -96,7 +104,9 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.pretrained_model == args.restart:
-        raise ValueError(f'Pretrained model for evaluation should not be restarted as this would have no effect. Select only one of both options....')
+        raise ValueError(
+            'Pretrained model for evaluation should not be restarted as this would have no effect. Select only one of both options....'
+        )
 
     infer = args.mode == "infer"
     config, structure, restart = load_parameters(args.config, args.restart or args.flow,infer, args.debug, args.pretrained_model)

@@ -64,11 +64,7 @@ class L2NormConv2d(nn.Module):
                 self.kernel_size,
             )
         )
-        if bias:
-            self.bias = nn.Parameter(torch.Tensor(self.out_channels))
-        else:
-            self.bias = None
-
+        self.bias = nn.Parameter(torch.Tensor(self.out_channels)) if bias else None
         self.beta = nn.Parameter(
             torch.zeros([1, out_channels, 1, 1], dtype=torch.float32)
         )
@@ -76,10 +72,7 @@ class L2NormConv2d(nn.Module):
             torch.ones([1, out_channels, 1, 1], dtype=torch.float32)
         )
         # init
-        if callable(init):
-            self.init_fn = init
-        else:
-            self.init_fn = lambda: False
+        self.init_fn = init if callable(init) else (lambda: False)
         normal_(self.weight, mean=0.0, std=0.05)
         if self.bias is not None:
             fan_in, _ = _calculate_fan_in_and_fan_out(self.weight)
@@ -148,7 +141,7 @@ class NormConv2d(nn.Module):
 class Downsample(nn.Module):
     def __init__(self, channels, out_channels=None, conv_layer=NormConv2d):
         super().__init__()
-        if out_channels == None:
+        if out_channels is None:
             self.down = conv_layer(
                 channels, channels, kernel_size=3, stride=2, padding=1
             )
@@ -203,10 +196,7 @@ class VunetRNB(nn.Module):
             self.nin = conv_layer(a_channels, channels, kernel_size=1)
 
         if activate:
-            if act_fn is None:
-                self.act_fn = nn.ELU()
-            else:
-                self.act_fn = act_fn
+            self.act_fn = nn.ELU() if act_fn is None else act_fn
         else:
             self.act_fn = IDAct()
 
@@ -237,12 +227,11 @@ class BasicFullyConnectedNet(nn.Module):
     def __init__(self, dim, depth, hidden_dim=256, use_tanh=False, use_bn=False,
                  out_dim=None):
         super(BasicFullyConnectedNet, self).__init__()
-        layers = []
-        layers.append(nn.Linear(dim, hidden_dim))
+        layers = [nn.Linear(dim, hidden_dim)]
         if use_bn:
             layers.append(nn.BatchNorm1d(hidden_dim))
         layers.append(nn.LeakyReLU())
-        for d in range(depth):
+        for _ in range(depth):
             layers.append(nn.Linear(hidden_dim, hidden_dim))
             if use_bn:
                 layers.append(nn.BatchNorm1d(hidden_dim))
@@ -601,14 +590,14 @@ class ARFullyConnectedNet(nn.Module):
                     y = nn.functional.relu(y)
                 y = self.condnet[i](y)
                 x = self.net[i](x) + y
-            return x
         else:
             assert y is None
             for i in range(len(self.net)):
                 if i > 0:
                     x = nn.functional.relu(x)
                 x = self.net[i](x)
-            return x
+
+        return x
 
 
 class BasicUnConnectedNet(nn.Module):
@@ -620,11 +609,9 @@ class BasicUnConnectedNet(nn.Module):
         assert self.out_dim % self.dim == 0
         self.factor = self.out_dim // self.dim
 
-        layers = []
-        layers.append(nn.Conv1d(in_channels=1, out_channels=hidden_dim,
-                                kernel_size=1))
+        layers = [nn.Conv1d(in_channels=1, out_channels=hidden_dim, kernel_size=1)]
         layers.append(nn.LeakyReLU())
-        for d in range(depth):
+        for _ in range(depth):
             layers.append(nn.Conv1d(in_channels=hidden_dim,
                                     out_channels=hidden_dim, kernel_size=1))
             layers.append(nn.LeakyReLU())

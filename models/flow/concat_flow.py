@@ -72,7 +72,7 @@ class ConditionalTransformer(nn.Module):
         n_flows = kwargs["n_flows"]
         conditioning_option =  kwargs["conditioning_option"]
         flowactivation = "lrelu"
-        embedding_channels =  kwargs["embedding_channels"] if "embedding_channels" in kwargs else in_channels
+        embedding_channels = kwargs.get("embedding_channels", in_channels)
         n_down = kwargs["embedder_down"]
         self.emb_channels = embedding_channels
         self.in_channels = in_channels
@@ -88,15 +88,12 @@ class ConditionalTransformer(nn.Module):
             self.embedder = Embedder(conditioning_spatial_size, conditioning_in_channels, in_channels, n_down=n_down)
 
     def embed(self, conditioning):
-        # embed it via embedding layer
-        embedding = self.embedder(conditioning)
-        return embedding
+        return self.embedder(conditioning)
 
     def sample(self, shape, conditioning):
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')   
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         z_tilde = torch.randn(shape).to(device)
-        sample = self.reverse(z_tilde, self.embed(conditioning))
-        return sample
+        return self.reverse(z_tilde, self.embed(conditioning))
 
     def forward(self, input, conditioning, reverse=False, train=False):
         if len(input.shape) == 2:

@@ -87,8 +87,7 @@ class PartDiscriminator(nn.Module):
         blocks = []
         nf = 16
         spatial_size = part_size
-        for i in range(self.n_scales):
-
+        for _ in range(self.n_scales):
             blocks.append(VunetRNB(channels=nf, conv_layer=conv_layer,dropout_prob=dropout_prob))
 
             out_c = min(2 * nf, max_filters)
@@ -107,9 +106,7 @@ class PartDiscriminator(nn.Module):
         h = self.feature_extractor(h)
 
         h = h.view(-1, self.n_linear_units)
-        out = self.classifier(h)
-
-        return out
+        return self.classifier(h)
 
 
 class DiscTrainer(object):
@@ -177,7 +174,7 @@ class DiscTrainer(object):
             "dloss_f": fake_loss.item(),
         }
         if self.use_gp:
-            out.update({"gp": reg.item()})
+            out["gp"] = reg.item()
 
         return out
 
@@ -252,5 +249,4 @@ def compute_grad2(d_out, x_in,allow_unused=False):
     grad_dout = grad_dout[0]
     grad_dout2 = grad_dout.pow(2)
     assert grad_dout2.size() == x_in.size()
-    reg = grad_dout2.view(batch_size, -1).sum(1)
-    return reg
+    return grad_dout2.view(batch_size, -1).sum(1)

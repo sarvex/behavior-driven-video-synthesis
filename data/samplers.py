@@ -76,7 +76,7 @@ class EntireSequenceSampler(Sampler):
 class PerPersonSampler(Sampler):
     def __init__(self, dataset, **kwargs):
         # super().__init__(dataset)
-        if "manual_rseed" in kwargs.keys() and kwargs["manual_rseed"]:
+        if "manual_rseed" in kwargs and kwargs["manual_rseed"]:
             set_np_random_seed()
 
         if not issubclass(type(dataset), BaseDataset):
@@ -90,10 +90,7 @@ class PerPersonSampler(Sampler):
             )
 
         self.dataset = dataset
-        if (
-            "sampling_dist" in kwargs.keys()
-            and kwargs["sampling_dist"] is not None
-        ):
+        if "sampling_dist" in kwargs and kwargs["sampling_dist"] is not None:
             self.sampling_dist = torch.tensor(kwargs["sampling_dist"])
         else:
             self.sampling_dist = None
@@ -107,15 +104,14 @@ class PerPersonSampler(Sampler):
         n = self.dataset.datadict["img_paths"].shape[0]
         if self.sampling_dist is None:
             return iter(torch.randperm(n).tolist())
-        else:
-            n = len(self.dataset)
-            assert self.sampling_dist.shape[0] == n
+        n = len(self.dataset)
+        assert self.sampling_dist.shape[0] == n
 
-            return iter(
-                torch.multinomial(
-                    self.sampling_dist, n, replacement=True
-                ).tolist()
-            )
+        return iter(
+            torch.multinomial(
+                self.sampling_dist, n, replacement=True
+            ).tolist()
+        )
 
     def __len__(self):
         return self.dataset.datadict["img_paths"].shape[0]
@@ -183,7 +179,7 @@ class WeightedDataSampler(Sampler):
         assert "keypoints" in self.dataset.datakeys
 
         max_valid_lag = self.dataset.seq_length * max(self.dataset.valid_lags)
-        motion_per_sample = list()
+        motion_per_sample = []
         for idx in tqdm(
             range(len(self.dataset)),
             desc=f"Compute motion distribution weights: exp_weight={self.alpha_data}",
@@ -224,18 +220,16 @@ class WeightedDataSampler(Sampler):
         return sampling_prob_motion / np.sum(sampling_prob_motion)
 
     def __iter__(self):
-        # choose data sampling
-        if self.motion_sampling:
-            self.sample_weights = deepcopy(self._get_motion_weights())
-            return iter(
-                torch.multinomial(
-                    torch.tensor(self.sample_weights),
-                    len(self.dataset),
-                    replacement=True,
-                ).tolist()
-            )
-        else:
+        if not self.motion_sampling:
             return iter(torch.randperm(len(self.dataset)).tolist())
+        self.sample_weights = deepcopy(self._get_motion_weights())
+        return iter(
+            torch.multinomial(
+                torch.tensor(self.sample_weights),
+                len(self.dataset),
+                replacement=True,
+            ).tolist()
+        )
 
 
 class SequenceSampler(BatchSampler):

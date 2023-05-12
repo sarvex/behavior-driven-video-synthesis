@@ -113,8 +113,7 @@ Raises
         theta = 2 * np.pi - theta
         r0 = -r0
 
-    r = r0 * theta
-    return r
+    return r0 * theta
 
 
 def rotmat2quat(R):
@@ -167,12 +166,11 @@ Returns
     r0 = np.divide(r, theta + np.finfo(np.float32).eps)
     r0x = np.array([0, -r0[2], r0[1], 0, 0, -r0[0], 0, 0, 0]).reshape(3, 3)
     r0x = r0x - r0x.T
-    R = (
+    return (
         np.eye(3, 3)
         + np.sin(theta) * r0x
         + (1 - np.cos(theta)) * (r0x).dot(r0x)
     )
-    return R
 
 
 def unNormalizeData(normalizedData, data_mean, data_std, dimensions_to_ignore):
@@ -193,11 +191,7 @@ Returns
     D = data_mean.shape[0]
 
     origData = np.zeros((T, D), dtype=np.float32)
-    dimensions_to_use = []
-    for i in range(D):
-        if i in dimensions_to_ignore:
-            continue
-        dimensions_to_use.append(i)
+    dimensions_to_use = [i for i in range(D) if i not in dimensions_to_ignore]
     dimensions_to_use = np.array(dimensions_to_use)
 
     origData[:, dimensions_to_use] = normalizedData
@@ -222,21 +216,7 @@ Returns
   poses_out: A tensor of size (batch_size, seq_length, dim) output. Each
   batch is an n-by-d sequence of poses.data_conversions
 """
-    # seq_len = len(poses)
-    # if seq_len == 0:
-    #     return []
-    #
-    # batch_size, dim = poses[0].shape
-    #
-    # poses_out = np.concatenate(poses)
-    # poses_out = np.reshape(poses_out, (seq_len, batch_size, dim))
-    # poses_out = np.transpose(poses_out, [1, 0, 2])
-
-    # poses_out_list = []
-
-    poses_unnorm = unNormalizeData(poses, data_mean, data_std, dim_to_ignore)
-
-    return poses_unnorm
+    return unNormalizeData(poses, data_mean, data_std, dim_to_ignore)
 
 
 def readCSVasFloat(filename):
@@ -256,8 +236,7 @@ Returns
         if len(line) > 0:
             returnArray.append(np.array([np.float32(x) for x in line]))
 
-    returnArray = np.array(returnArray)
-    return returnArray
+    return np.array(returnArray)
 
 
 def load_data(path_to_dataset, subjects, actions, one_hot):
@@ -374,12 +353,8 @@ Returns
     data_mean = np.mean(completeData, axis=0)
     data_std = np.std(completeData, axis=0)
 
-    dimensions_to_ignore = []
-    dimensions_to_use = []
-
-    dimensions_to_ignore.extend(list(np.where(data_std < 1e-4)[0]))
-    dimensions_to_use.extend(list(np.where(data_std >= 1e-4)[0]))
-
+    dimensions_to_ignore = list(list(np.where(data_std < 1e-4)[0]))
+    dimensions_to_use = list(list(np.where(data_std >= 1e-4)[0]))
     data_std[dimensions_to_ignore] = 1.0
 
     return data_mean, data_std, dimensions_to_ignore, dimensions_to_use
@@ -627,7 +602,7 @@ def fkl(
 
     # Structure that indicates parents for each joint
     njoints = 32
-    xyzStruct = [dict() for x in range(njoints)]
+    xyzStruct = [{} for _ in range(njoints)]
 
     for i in np.arange(njoints):
 
@@ -734,7 +709,7 @@ def kinematic_tree():
         "children": [],
     }
     for i, tr in enumerate(skel_tree):
-        if not tr.tag == "tree":
+        if tr.tag != "tree":
             continue
         for i, item in enumerate(tr):
             childs = list(item.iter())
@@ -752,7 +727,7 @@ def kinematic_tree():
                 }
 
             for c in childs:
-                if c.tag in mappings.keys():
+                if c.tag in mappings:
                     if c.text != "None" and c.text is not None:
                         kin_tree[c.tag].append(
                             list(map(mappings[c.tag], c.text[1:-1].split()))
@@ -1045,19 +1020,17 @@ class Ax3DPose(object):
 
 
 def convert_to_3d(poses_as_angles, kinematic_tree, swap_yz):
-    poses_3d = []
-    for pose in poses_as_angles:
-        poses_3d.append(
-            fkl(
-                pose,
-                kinematic_tree["parent"],
-                kinematic_tree["offset"],
-                kinematic_tree["rotInd"],
-                kinematic_tree["expmapInd"],
-                kinematic_tree["posInd"]["ids"],
-            )
+    poses_3d = [
+        fkl(
+            pose,
+            kinematic_tree["parent"],
+            kinematic_tree["offset"],
+            kinematic_tree["rotInd"],
+            kinematic_tree["expmapInd"],
+            kinematic_tree["posInd"]["ids"],
         )
-
+        for pose in poses_as_angles
+    ]
     poses_3d = np.stack(poses_3d, axis=0)
     poses_3d = poses_3d.reshape((poses_3d.shape[0], 32, -1))
     if swap_yz:
@@ -1098,7 +1071,7 @@ def project_onto_image_plane(
     :param app_img:
     :return:
     """
-    if color == None:
+    if color is None:
         color = [[255, 0, 0],[255, 0, 0],[0, 0, 255],[0, 0, 255],[0, 0, 255],[255, 0, 0],[0, 0, 255],[0, 0, 255],[0, 0, 255],[0, 0, 255],[0, 0, 255],[255, 0, 0],[0, 0, 255],[0, 0, 255],[255, 0, 0],[255, 0, 0]]
         assert len(color) == len(dataset.joint_model.total_relative_joints)
 
@@ -1141,11 +1114,7 @@ def project_onto_image_plane(
             color_joints=color,
         )
         if cond_id is not None:
-            if id_count < cond_id:
-                text = text + "; COND"
-            else:
-                text = text + "; PRED"
-
+            text = f"{text}; COND" if id_count < cond_id else f"{text}; PRED"
         img = cv2.putText(img,text,org,cv2.FONT_HERSHEY_SIMPLEX,font_size,(0,0,0),thickness=thickness)
         if synth_model is not None:
             # rescale joints

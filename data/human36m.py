@@ -50,12 +50,8 @@ class Human36mDataset(BaseDataset):
         self, transforms, data_keys, seq_length, mode="train", **kwargs
     ):
         assert mode in ["train", "test"]
-        self.small_joint_model = (
-            kwargs["small_joint_model"]
-            if "small_joint_model" in kwargs.keys()
-            else False
-        )
-        self.action_split_type = kwargs["action_split_type"] if "action_split_type" in kwargs else "default"
+        self.small_joint_model = kwargs.get("small_joint_model", False)
+        self.action_split_type = kwargs.get("action_split_type", "default")
         self.valid_keypoint_types = [
             "angle_euler",
             "norm_keypoints",
@@ -224,7 +220,7 @@ class Human36mDataset(BaseDataset):
                     partial(t2p, ids=[7, 8]),  # left lower leg
                 ],
             )
-        self.debug = "debug" in kwargs.keys() and kwargs["debug"]
+        self.debug = "debug" in kwargs and kwargs["debug"]
 
         super().__init__(
             transforms, mode, seq_length, data_keys, joint_model, **kwargs
@@ -254,15 +250,9 @@ class Human36mDataset(BaseDataset):
             self.prepare_seq_matching = False
             self.use_matched_map_ids = True
 
-        self.train_synthesis = (
-            kwargs["train_synthesis"] if "train_synthesis" in kwargs else False
-        )
+        self.train_synthesis = kwargs.get("train_synthesis", False)
 
-        self.use_3d_for_stickman = (
-            kwargs["use_3d_for_stickman"]
-            if "use_3d_for_stickman" in kwargs
-            else False
-        )
+        self.use_3d_for_stickman = kwargs.get("use_3d_for_stickman", False)
         if self.use_3d_for_stickman:
             self._output_dict["stickman"] = self._get_stickman_from_3d
             assert self.keypoint_key in [
@@ -299,17 +289,9 @@ class Human36mDataset(BaseDataset):
                 ]
             )
 
-        self.actions_to_discard = (
-            kwargs["actions_to_discard"]
-            if "actions_to_discard" in kwargs
-            else None
-        )
+        self.actions_to_discard = kwargs.get("actions_to_discard", None)
 
-        self.prepare_seq_matching = (
-            kwargs["prepare_seq_matching"]
-            if "prepare_seq_matching" in kwargs
-            else False
-        )
+        self.prepare_seq_matching = kwargs.get("prepare_seq_matching", False)
 
         # if self.motion_based_sampling:
         #     assert not self.prepare_seq_matching
@@ -437,7 +419,7 @@ class Human36mDataset(BaseDataset):
         return self.datadict["img_paths"].shape[0]
 
     def _get_target_app_image(self):
-        if not self.target_app in self.get_test_app_images().keys():
+        if self.target_app not in self.get_test_app_images().keys():
             raise TypeError(
                 f"The target appearance has to be a string object in {list(self.get_test_app_images().keys())}."
             )
@@ -451,7 +433,7 @@ class Human36mDataset(BaseDataset):
         elif version == "h36m_full":
             self._load_h36m_full(basepath)
         else:
-            raise Exception(f"Dataset version not valid.")
+            raise Exception("Dataset version not valid.")
 
     # human3.6m full dataset
     def _load_h36m_full(self, basepath):
